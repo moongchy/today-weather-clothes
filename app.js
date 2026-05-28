@@ -106,6 +106,7 @@ function buildChart(dayData) {
         return pop > 0 ? `☔${pop}%` : '';
     });
 
+    // 배경 그라데이션 설정
     const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
     const startHour = new Date(dayData[0].dt * 1000).getHours();
     const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
@@ -140,7 +141,6 @@ function buildChart(dayData) {
 
     if (myChart) myChart.destroy();
 
-    // 플러그인 충돌을 피하기 위해 안전한 방식으로 구성 요소를 적용합니다.
     myChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -148,14 +148,16 @@ function buildChart(dayData) {
             datasets: [{
                 label: '기온',
                 data: temps,
-                borderColor: '#ffffff',
-                borderWidth: 3,
-                backgroundColor: 'transparent',
+                // 어두운 배경과 밝은 배경 모두에서 뚜렷하게 보이도록 진한 남색/블루 계열 선 사용
+                borderColor: '#1e3a8a', 
+                borderWidth: 4,
+                backgroundColor: 'rgba(30, 58, 138, 0.1)',
                 fill: false,
                 tension: 0.3,
                 pointRadius: 6,
-                pointBackgroundColor: '#4a90e2',
-                pointBorderColor: '#ffffff'
+                pointBackgroundColor: '#2563eb', // 포인트는 선명한 파란색
+                pointBorderColor: '#1e3a8a',
+                pointBorderWidth: 2
             }]
         },
         options: {
@@ -163,14 +165,16 @@ function buildChart(dayData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // 외부 플러그인 의존성을 내부 안전 옵션으로 대체
+                // 글씨가 흐릿하게 묻히는 것을 막기 위해 색상 및 드롭 섀도우(그림자) 효과 부여
                 datalabels: {
                     display: true,
                     align: 'top',
                     anchor: 'end',
-                    offset: 2,
-                    font: { weight: 'bold', size: 11 },
-                    color: '#ffffff',
+                    offset: 4,
+                    font: { weight: 'bold', size: 13 },
+                    color: '#0f172a', // 어떤 배경에서도 살아남는 매우 진한 색상 선택
+                    textStrokeColor: '#ffffff', // 글씨 외곽선 테두리를 흰색으로 줘서 가독성 200% 확보
+                    textStrokeWidth: 3,
                     formatter: function(value, context) {
                         const idx = context.dataIndex;
                         return `${value}°C\n${rainInfos[idx] || ''}`;
@@ -181,52 +185,4 @@ function buildChart(dayData) {
                 y: { 
                     display: false, 
                     min: Math.min(...temps) - 4, 
-                    max: Math.max(...temps) + 5 
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } }
-                }
-            }
-        },
-        plugins: [
-            ChartDataLabels, // 전역 인스턴스 명시 등록
-            {
-                id: 'custom_canvas_background_color',
-                beforeDraw: (chart) => {
-                    const {ctx: chartCtx, canvas: chartCanvas} = chart;
-                    chartCtx.save();
-                    chartCtx.fillStyle = backgroundGradient;
-                    chartCtx.fillRect(0, 0, chartCanvas.width, chartCanvas.height);
-                    chartCtx.restore();
-                }
-            }
-        ]
-    });
-
-    setTimeout(() => {
-        chartWrapper.scrollLeft = 245; 
-    }, 150);
-}
-
-function renderForecastTable(allData) {
-    const tbody = document.getElementById('forecast-body');
-    tbody.innerHTML = '';
-    const dailyData = allData.filter((item, index) => index % 8 === 0);
-
-    dailyData.forEach(item => {
-        const date = new Date(item.dt * 1000);
-        const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
-        const row = `
-            <tr>
-                <td><strong>${dayStr}</strong></td>
-                <td>${item.weather[0].description}</td>
-                <td style="color: #4a90e2">${Math.round(item.main.temp_min)}°C</td>
-                <td style="color: #e24a4a">${Math.round(item.main.temp_max)}°C</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
-}
-
-initApp();
+                    max: Math.max(...temps) +
