@@ -23,21 +23,24 @@ function recommendOutfit(temp) {
     }
 }
 
-// 2. 로컬의 api.txt에서 API KEY 불러오기 후 날씨 데이터 가져오기
 async function initApp() {
     try {
-        // 로컬에서 테스트할 때는 같은 폴더의 api.txt를 읽어옵니다.
-        const responseText = await fetch('api.txt');
-        const apiKey = (await responseText.text()).trim();
+        // Vercel 환경변수에서 API Key를 가져옵니다. 
+        // 만약 환경변수가 없다면(로컬 테스트용) 기존처럼 api.txt를 찾습니다.
+        let apiKey = window.env?.WEATHER_API_KEY; 
 
-        if (!apiKey) throw new Error("API Key가 api.txt에 없습니다.");
+        if (!apiKey) {
+            const responseText = await fetch('api.txt');
+            apiKey = (await responseText.text()).trim();
+        }
+
+        if (!apiKey) throw new Error("API Key를 찾을 수 없습니다.");
 
         // GPS 위치 가져오기
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
-                
                 getWeatherData(lat, lon, apiKey);
             }, () => {
                 alert("위치 정보 권한을 허용해 주셔야 현재 위치의 날씨 기반 복장 추천이 가능합니다.");
