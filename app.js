@@ -13,7 +13,6 @@ let globalWeatherData = null;
 let currentTab = 'today';
 let myChart = null;
 
-// 날씨 코드를 한국어 텍스트로 변환 (WMO Code 표준 적용)
 function getWeatherDesc(code) {
     const codes = {
         0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림",
@@ -43,25 +42,57 @@ function initApp() {
         navigator.geolocation.getCurrentPosition(position => {
             getWeatherData(position.coords.latitude, position.coords.longitude);
         }, () => {
-            // 위치 권한 거부 시 기본값 (서울 주포 좌표 설정)
-            getWeatherData(37.5665, 126.9780);
+            getWeatherData(37.5665, 126.9780); // 서울 기본값
         });
     }
 }
 
 async function getWeatherData(lat, lon) {
-    // past_days=1 옵션으로 어제/오늘 새벽 과거 데이터 확보 + 일출/일몰(daily=sunrise,sunset) 동시 호출
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&past_days=1`;
-    
     try {
         const response = await fetch(url);
         globalWeatherData = await response.json();
-        
-        // 역지오코딩 없이 간결하게 좌표 표시 처리
         document.getElementById('location').innerText = `📍 현재 위치 영역`;
+        
+        // 사이트 전체 배경 먼저 실시간으로 적용
+        updateSiteBackground();
+        
         renderPage();
         renderForecastTable(globalWeatherData.daily);
     } catch (e) { console.error(e); }
+}
+
+// 🌟 [추가] 실시간 일출/일몰 연동형 사이트 배경 전환 시스템
+function updateSiteBackground() {
+    if (!globalWeatherData) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    // 오늘의 일출/일몰 시간 획득 (past_days=1 이므로 인덱스 1이 오늘)
+    const sunriseStr = globalWeatherData.daily.sunrise[1];
+    const sunsetStr = globalWeatherData.daily.sunset[1];
+    const sunriseHour = sunriseStr ? new Date(sunriseStr).getHours() : 6;
+    const sunsetHour = sunsetStr ? new Date(sunsetStr).getHours() : 19;
+
+    let backgroundStyle = "";
+
+    if (currentHour >= sunriseHour && currentHour < sunriseHour + 2) {
+        // 1. 아침 일출 시점 (은은한 새벽 노을빛 연청보라)
+        backgroundStyle = "linear-gradient(135deg, #ffafbd 0%, #ffc3a0 100%)";
+    } else if (currentHour >= sunriseHour + 2 && currentHour < sunsetHour - 1) {
+        // 2. 완전한 낮 (시원하고 화사한 스카이 블루)
+        backgroundStyle = "linear-gradient(135deg, #74ebe7 0%, #4a90e2 100%)";
+    } else if (currentHour >= sunsetHour - 1 && currentHour <= sunsetHour + 1) {
+        // 3. 저녁 일몰 시점 (환상적인 핑크빛 보라 노을)
+        backgroundStyle = "linear-gradient(135deg, #ed4264 0%, #ffedbc 100%)";
+    } else {
+        // 4. 깊은 밤 (시크하고 깊이감 있는 은하수 네이비)
+        backgroundStyle = "linear-gradient(135deg, #1f4068 0%, #162447 50%, #101d42 100%)";
+    }
+
+    // 웹사이트 전체 body 배경에 주입
+    document.body.style.background = backgroundStyle;
 }
 
 function renderPage() {
@@ -70,9 +101,8 @@ function renderPage() {
     const hourly = globalWeatherData.hourly;
     const targetDate = new Date();
     if (currentTab === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
-    const targetStr = targetDate.toLocaleDateString('sv'); // YYYY-MM-DD 포맷 안전 추출
+    const targetStr = targetDate.toLocaleDateString('sv');
 
-    // 0시부터 24시까지 시간대별로 쪼개진 배열 생성
     const dayDataList = [];
     for (let i = 0; i < hourly.time.length; i++) {
         const itemDateStr = hourly.time[i].substring(0, 10);
@@ -88,7 +118,6 @@ function renderPage() {
 
     if (dayDataList.length === 0) return;
 
-    // 현재 실시간 온도 표출을 위해 현재 시간과 가장 가까운 인덱스 매칭
     const now = new Date();
     let currentMatch = dayDataList[0];
     if (currentTab === 'today') {
@@ -98,11 +127,10 @@ function renderPage() {
 
     document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°C`;
     document.getElementById('weather-desc').innerText = currentTab === 'today' ? "실시간 기온 정보" : "내일 예보 기온";
-    
     document.getElementById('rain-display').innerText = `💧 강수확률: ${currentMatch.pop}% ${currentMatch.rain > 0 ? `(예상 강수량: ${currentMatch.rain}mm)` : ''}`;
 
     recommendOutfit(currentMatch.temp);
-    document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘 00시 ~ 24시 고정' : '내일 00시 ~ 24시 고정'})`;
+    document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
     
     buildChart(dayDataList);
 }
@@ -114,41 +142,18 @@ function switchDay(day) {
     renderPage();
 }
 
+// 📊 수치만 투명하고 깨끗하게 강조하는 차트 함수로 개편
 function buildChart(dayData) {
     const canvas = document.getElementById('tempChart');
     const ctx = canvas.getContext('2d');
     const chartWrapper = document.getElementById('chartWrapper');
-    const bgLayer = document.getElementById('chartBg');
     
+    // 그래프 뒷배경 색상(chartBg)은 더 이상 필요 없으므로 제거 또는 투명화 처리
+    const bgLayer = document.getElementById('chartBg');
+    if (bgLayer) bgLayer.style.background = "transparent";
+
     const labels = dayData.map(d => `${d.time.getHours()}시`);
     const temps = dayData.map(d => Math.round(d.temp));
-    const rainInfos = dayData.map(d => d.pop > 0 ? `☔${d.pop}%` : '');
-
-    // 일출/일몰 인덱스 파악
-    const dailyIndex = currentTab === 'today' ? 1 : 2; // past_days=1이라 오늘 인덱스는 1, 내일은 2
-    const sunriseStr = globalWeatherData.daily.sunrise[dailyIndex];
-    const sunsetStr = globalWeatherData.daily.sunset[dailyIndex];
-
-    const sunriseHour = sunriseStr ? new Date(sunriseStr).getHours() : 6;
-    const sunsetHour = sunsetStr ? new Date(sunsetStr).getHours() : 19;
-
-    // 0시부터 23시 고정폭 비율 그라데이션 배치 (전체 23시간 기준)
-    const totalDuration = 23; 
-    const getStopPercent = (hour) => Math.round((hour / totalDuration) * 100);
-
-    const sunrisePct = getStopPercent(sunriseHour);
-    const sunsetPct = getStopPercent(sunsetHour);
-
-    let cssGradient = `linear-gradient(to right, #1e2530 0%`;
-    if (sunrisePct > 0 && sunrisePct < 100) {
-        cssGradient += `, #232d3d ${Math.max(0, sunrisePct - 8)}%, #fef3c7 ${sunrisePct}%, #fff7ed ${Math.min(100, sunrisePct + 8)}%`;
-    }
-    if (sunsetPct > 0 && sunsetPct < 100) {
-        cssGradient += `, #fff7ed ${Math.max(0, sunsetPct - 8)}%, #ffedd5 ${sunsetPct}%, #111827 ${Math.min(100, sunsetPct + 8)}%`;
-    }
-    cssGradient += `, #0f172a 100%)`;
-    
-    if (bgLayer) bgLayer.style.background = cssGradient;
 
     if (myChart) myChart.destroy();
 
@@ -159,14 +164,14 @@ function buildChart(dayData) {
             datasets: [{
                 label: '기온',
                 data: temps,
-                borderColor: '#2563eb', 
+                borderColor: '#1d4ed8', // 짙고 뚜렷한 메인 블루 라인
                 borderWidth: 4,
                 backgroundColor: 'transparent',
                 fill: false,
                 tension: 0.2,
                 pointRadius: 5,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#2563eb',
+                pointBorderColor: '#1d4ed8',
                 pointBorderWidth: 3
             }]
         },
@@ -179,25 +184,25 @@ function buildChart(dayData) {
                     display: true,
                     align: 'top',
                     anchor: 'end',
-                    offset: 4,
-                    font: { weight: 'bold', size: 12 },
-                    color: '#0f172a', 
+                    offset: 5,
+                    font: { weight: 'bold', size: 13 },
+                    color: '#1e293b', 
                     textStrokeColor: '#ffffff',
                     textStrokeWidth: 3,
-                    formatter: (value, context) => `${value}°C\n${rainInfos[context.dataIndex] || ''}`
+                    formatter: (value) => `${value}°C` // ☔ 강수확률 표기 제거 완료!
                 }
             },
             scales: {
                 y: { 
                     display: false, 
-                    min: Math.min(...temps) - 4, 
-                    max: Math.max(...temps) + 5 
+                    min: Math.min(...temps) - 3, 
+                    max: Math.max(...temps) + 3 
                 },
                 x: {
                     grid: { display: false },
                     ticks: { 
-                        color: '#0f172a',
-                        font: { size: 11, weight: 'bold' },
+                        color: '#1e293b',
+                        font: { size: 12, weight: 'bold' },
                         textStrokeColor: '#ffffff',
                         textStrokeWidth: 2
                     }
@@ -207,7 +212,6 @@ function buildChart(dayData) {
         plugins: [ChartDataLabels]
     });
 
-    // 오전 9시와 오후 6시(18시) 구간이 정중앙에 편안하게 포함되도록 기본 스크롤값 포커싱
     setTimeout(() => {
         chartWrapper.scrollLeft = 280; 
     }, 150);
@@ -217,7 +221,6 @@ function renderForecastTable(daily) {
     const tbody = document.getElementById('forecast-body');
     tbody.innerHTML = '';
 
-    // 인덱스 1번(오늘)부터 하단 리스트 주간 예보 매칭
     for (let i = 1; i < daily.time.length; i++) {
         const date = new Date(daily.time[i]);
         const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
