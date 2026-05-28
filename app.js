@@ -33,18 +33,44 @@ async function initApp() {
         if (!apiKey) throw new Error("API Key가 api.txt에 없습니다.");
 
         // GPS 위치 가져오기
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(position => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
-                getWeatherData(lat, lon, apiKey);
-            }, () => {
-                alert("위치 정보 권한을 허용해 주셔야 현재 위치의 날씨 기반 복장 추천이 가능합니다.");
-            });
-        } else {
-            alert("이 브라우저에서는 GPS를 지원하지 않습니다.");
-        }
+        // app.js의 이 부분을 찾아 아래 코드로 교체해 주세요!
+if (navigator.geolocation) {
+    // iOS Safari 안정성을 위한 옵션 설정
+    const geoOptions = {
+        enableHighAccuracy: false, // true로 하면 아이폰이 GPS 잡느라 너무 오래 걸려서 뻗을 수 있음
+        timeout: 5000,             // 5초 안에 못 가져오면 에러 던지기
+        maximumAge: 60000          // 1분 이내에 캐싱된 위치 정보가 있다면 재사용
+    };
+
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            getWeatherData(lat, lon, apiKey);
+        }, 
+        error => {
+            // 아이폰에서 어떤 에러가 나는지 구체적으로 확인하기 위한 알림창
+            console.error("GPS 에러 상세:", error);
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    alert("위치 권한 요청이 거부되었습니다. 설정 -> Safari -> 위치에서 허용해 주세요.");
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    alert("위치 정보를 사용할 수 없습니다. (GPS 신호 약함 또는 꺼짐)");
+                    break;
+                case error.TIMEOUT:
+                    alert("위치 정보를 가져오는 시간이 초과되었습니다. 다시 시도해 주세요.");
+                    break;
+                default:
+                    alert("위치 오류 발생: " + error.message);
+                    break;
+            }
+        },
+        geoOptions
+    );
+} else {
+    alert("이 브라우저에서는 GPS를 지원하지 않습니다.");
+}
     } catch (error) {
         console.error("초기화 실패:", error);
         document.getElementById('weather-desc').innerText = "API 로드 실패";
