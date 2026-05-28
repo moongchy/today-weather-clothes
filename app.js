@@ -98,6 +98,7 @@ function buildChart(dayData) {
     const canvas = document.getElementById('tempChart');
     const ctx = canvas.getContext('2d');
     const chartWrapper = document.getElementById('chartWrapper');
+    const bgLayer = document.getElementById('chartBg');
     
     const labels = dayData.map(item => `${new Date(item.dt * 1000).getHours()}시`);
     const temps = dayData.map(item => Math.round(item.main.temp));
@@ -106,39 +107,38 @@ function buildChart(dayData) {
         return pop > 0 ? `☔${pop}%` : '';
     });
 
-    // 배경 그라데이션 설정
-    const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
+    // 1. CSS 그라데이션 동적 생성 (DOM 직접 제어하여 충돌 원천 차단)
     const startHour = new Date(dayData[0].dt * 1000).getHours();
     const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
-    
     let totalDuration = endHour - startHour;
     if (totalDuration <= 0) totalDuration = 24;
 
     const sunriseHour = globalWeatherData.city.sunrise ? new Date(globalWeatherData.city.sunrise * 1000).getHours() : 6;
     const sunsetHour = globalWeatherData.city.sunset ? new Date(globalWeatherData.city.sunset * 1000).getHours() : 19;
 
-    const getStopPosition = (hour) => {
+    const getStopPercent = (hour) => {
         let pos = (hour - startHour) / totalDuration;
         if (pos < 0) pos += 1;
-        return Math.max(0, Math.min(1, pos));
+        return Math.round(Math.max(0, Math.min(1, pos)) * 100);
     };
 
-    const sunriseStop = getStopPosition(sunriseHour);
-    const sunsetStop = getStopPosition(sunsetHour);
+    const sunrisePct = getStopPercent(sunriseHour);
+    const sunsetPct = getStopPercent(sunsetHour);
 
-    backgroundGradient.addColorStop(0, '#1e2530');
-    if (sunriseStop > 0 && sunriseStop < 1) {
-        backgroundGradient.addColorStop(Math.max(0, sunriseStop - 0.05), '#232d3d');
-        backgroundGradient.addColorStop(sunriseStop, '#fef3c7'); 
-        backgroundGradient.addColorStop(Math.min(1, sunriseStop + 0.05), '#fff7ed');
+    // CSS 리니어 그라데이션 문장 조립
+    let cssGradient = `linear-gradient(to right, #1e2530 0%`;
+    if (sunrisePct > 0 && sunrisePct < 100) {
+        cssGradient += `, #232d3d ${Math.max(0, sunrisePct - 5)}%, #fef3c7 ${sunrisePct}%, #fff7ed ${Math.min(100, sunrisePct + 5)}%`;
     }
-    if (sunsetStop > 0 && sunsetStop < 1) {
-        backgroundGradient.addColorStop(Math.max(0, sunsetStop - 0.05), '#fff7ed');
-        backgroundGradient.addColorStop(sunsetStop, '#ffedd5'); 
-        backgroundGradient.addColorStop(Math.min(1, sunsetStop + 0.05), '#111827');
+    if (sunsetPct > 0 && sunsetPct < 100) {
+        cssGradient += `, #fff7ed ${Math.max(0, sunsetPct - 5)}%, #ffedd5 ${sunsetPct}%, #111827 ${Math.min(100, sunsetPct + 5)}%`;
     }
-    backgroundGradient.addColorStop(1, '#0f172a');
+    cssGradient += `, #0f172a 100%)`;
+    
+    // 배경 레이어에 그라데이션 적용
+    if (bgLayer) bgLayer.style.background = cssGradient;
 
+    // 2. 순수 Chart.js 설정 구성 (오버라이드 없음)
     if (myChart) myChart.destroy();
 
     myChart = new Chart(ctx, {
@@ -148,16 +148,15 @@ function buildChart(dayData) {
             datasets: [{
                 label: '기온',
                 data: temps,
-                // 어두운 배경과 밝은 배경 모두에서 뚜렷하게 보이도록 진한 남색/블루 계열 선 사용
-                borderColor: '#1e3a8a', 
+                borderColor: '#2563eb', // 선명한 블루 라인
                 borderWidth: 4,
-                backgroundColor: 'rgba(30, 58, 138, 0.1)',
+                backgroundColor: 'transparent',
                 fill: false,
                 tension: 0.3,
                 pointRadius: 6,
-                pointBackgroundColor: '#2563eb', // 포인트는 선명한 파란색
-                pointBorderColor: '#1e3a8a',
-                pointBorderWidth: 2
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#2563eb',
+                pointBorderWidth: 3
             }]
         },
         options: {
@@ -165,19 +164,17 @@ function buildChart(dayData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                // 글씨가 흐릿하게 묻히는 것을 막기 위해 색상 및 드롭 섀도우(그림자) 효과 부여
                 datalabels: {
                     display: true,
                     align: 'top',
                     anchor: 'end',
                     offset: 4,
                     font: { weight: 'bold', size: 13 },
-                    color: '#0f172a', // 어떤 배경에서도 살아남는 매우 진한 색상 선택
-                    textStrokeColor: '#ffffff', // 글씨 외곽선 테두리를 흰색으로 줘서 가독성 200% 확보
+                    color: '#0f172a', 
+                    textStrokeColor: '#ffffff',
                     textStrokeWidth: 3,
                     formatter: function(value, context) {
-                        const idx = context.dataIndex;
-                        return `${value}°C\n${rainInfos[idx] || ''}`;
+                        return `${value}°C\n${rainInfos[context.dataIndex] || ''}`;
                     }
                 }
             },
@@ -185,4 +182,45 @@ function buildChart(dayData) {
                 y: { 
                     display: false, 
                     min: Math.min(...temps) - 4, 
-                    max: Math.max(...temps) +
+                    max: Math.max(...temps) + 5 
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { 
+                        color: '#0f172a',
+                        font: { size: 12, weight: 'bold' },
+                        textStrokeColor: '#ffffff',
+                        textStrokeWidth: 2
+                    }
+                }
+            }
+        },
+        plugins: [ChartDataLabels] // 플러그인 정상 결합
+    });
+
+    setTimeout(() => {
+        chartWrapper.scrollLeft = 245; 
+    }, 150);
+}
+
+function renderForecastTable(allData) {
+    const tbody = document.getElementById('forecast-body');
+    tbody.innerHTML = '';
+    const dailyData = allData.filter((item, index) => index % 8 === 0);
+
+    dailyData.forEach(item => {
+        const date = new Date(item.dt * 1000);
+        const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
+        const row = `
+            <tr>
+                <td><strong>${dayStr}</strong></td>
+                <td>${item.weather[0].description}</td>
+                <td style="color: #4a90e2">${Math.round(item.main.temp_min)}°C</td>
+                <td style="color: #e24a4a">${Math.round(item.main.temp_max)}°C</td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+initApp();
