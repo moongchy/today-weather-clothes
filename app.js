@@ -53,18 +53,15 @@ function renderPage() {
     const list = globalWeatherData.list;
     const today = new Date();
     
-    // 타겟 날짜 설정
     const targetDate = new Date();
     if (currentTab === 'tomorrow') targetDate.setDate(today.getDate() + 1);
-    const targetStr = targetDate.toLocaleDateString('sv'); // YYYY-MM-DD 포맷 안전 추출
+    const targetStr = targetDate.toLocaleDateString('sv'); 
 
-    // 해당 날짜 데이터 필터링
     let dayDataList = list.filter(item => {
         const itemDateStr = new Date(item.dt * 1000).toLocaleDateString('sv');
         return itemDateStr === targetStr;
     });
 
-    // 만약 오늘 데이터가 밤 시간대 접속으로 인해 몇 개 없다면, 유저가 보기 편하게 직전 데이터라도 붙여서 시간축을 보정합니다.
     if (currentTab === 'today' && dayDataList.length < 8) {
         const remainingNeeded = 8 - dayDataList.length;
         const previousData = list.filter(item => {
@@ -76,7 +73,6 @@ function renderPage() {
 
     if (dayDataList.length === 0) return;
 
-    // 현재 기온 메인 세팅 (오늘 탭이면 가장 첫 데이터, 내일이면 내일의 첫 데이터)
     const mainData = currentTab === 'today' ? list[0] : dayDataList[0];
     document.getElementById('temp-display').innerText = `${Math.round(mainData.main.temp)}°C`;
     document.getElementById('weather-desc').innerText = mainData.weather[0].description;
@@ -110,13 +106,10 @@ function buildChart(dayData) {
         return pop > 0 ? `☔${pop}%` : '';
     });
 
-    // 안전하게 그라데이션 객체 정의
     const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
-    
     const startHour = new Date(dayData[0].dt * 1000).getHours();
     const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
     
-    // 시간 역전이나 나누기 0 에러 차단 분기문
     let totalDuration = endHour - startHour;
     if (totalDuration <= 0) totalDuration = 24;
 
@@ -125,9 +118,115 @@ function buildChart(dayData) {
 
     const getStopPosition = (hour) => {
         let pos = (hour - startHour) / totalDuration;
-        if (pos < 0) pos += 1; // 시간 오버플로우 방지
+        if (pos < 0) pos += 1;
         return Math.max(0, Math.min(1, pos));
     };
 
     const sunriseStop = getStopPosition(sunriseHour);
-    const sunsetStop = getStopPosition(sunsetHour
+    const sunsetStop = getStopPosition(sunsetHour);
+
+    backgroundGradient.addColorStop(0, '#1e2530');
+    if (sunriseStop > 0 && sunriseStop < 1) {
+        backgroundGradient.addColorStop(Math.max(0, sunriseStop - 0.05), '#232d3d');
+        backgroundGradient.addColorStop(sunriseStop, '#fef3c7'); 
+        backgroundGradient.addColorStop(Math.min(1, sunriseStop + 0.05), '#fff7ed');
+    }
+    if (sunsetStop > 0 && sunsetStop < 1) {
+        backgroundGradient.addColorStop(Math.max(0, sunsetStop - 0.05), '#fff7ed');
+        backgroundGradient.addColorStop(sunsetStop, '#ffedd5'); 
+        backgroundGradient.addColorStop(Math.min(1, sunsetStop + 0.05), '#111827');
+    }
+    backgroundGradient.addColorStop(1, '#0f172a');
+
+    if (myChart) myChart.destroy();
+
+    // 플러그인 충돌을 피하기 위해 안전한 방식으로 구성 요소를 적용합니다.
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '기온',
+                data: temps,
+                borderColor: '#ffffff',
+                borderWidth: 3,
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 6,
+                pointBackgroundColor: '#4a90e2',
+                pointBorderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                // 외부 플러그인 의존성을 내부 안전 옵션으로 대체
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    anchor: 'end',
+                    offset: 2,
+                    font: { weight: 'bold', size: 11 },
+                    color: '#ffffff',
+                    formatter: function(value, context) {
+                        const idx = context.dataIndex;
+                        return `${value}°C\n${rainInfos[idx] || ''}`;
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    display: false, 
+                    min: Math.min(...temps) - 4, 
+                    max: Math.max(...temps) + 5 
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } }
+                }
+            }
+        },
+        plugins: [
+            ChartDataLabels, // 전역 인스턴스 명시 등록
+            {
+                id: 'custom_canvas_background_color',
+                beforeDraw: (chart) => {
+                    const {ctx: chartCtx, canvas: chartCanvas} = chart;
+                    chartCtx.save();
+                    chartCtx.fillStyle = backgroundGradient;
+                    chartCtx.fillRect(0, 0, chartCanvas.width, chartCanvas.height);
+                    chartCtx.restore();
+                }
+            }
+        ]
+    });
+
+    setTimeout(() => {
+        chartWrapper.scrollLeft = 245; 
+    }, 150);
+}
+
+function renderForecastTable(allData) {
+    const tbody = document.getElementById('forecast-body');
+    tbody.innerHTML = '';
+    const dailyData = allData.filter((item, index) => index % 8 === 0);
+
+    dailyData.forEach(item => {
+        const date = new Date(item.dt * 1000);
+        const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
+        const row = `
+            <tr>
+                <td><strong>${dayStr}</strong></td>
+                <td>${item.weather[0].description}</td>
+                <td style="color: #4a90e2">${Math.round(item.main.temp_min)}°C</td>
+                <td style="color: #e24a4a">${Math.round(item.main.temp_max)}°C</td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+initApp();
