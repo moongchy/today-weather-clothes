@@ -1,19 +1,21 @@
 :root {
-    --bg-color: #f5f7fa;
-    --card-color: #ffffff;
-    --primary-color: #4a90e2;
-    --text-color: #333333;
-    --border-color: #e0e0e0;
+    --card-color: rgba(255, 255, 255, 0.85); /* 배경이 비치도록 살짝 투명하게 */
+    --text-color: #2c3e50;
+    --border-color: rgba(0, 0, 0, 0.08);
 }
 
 body {
     font-family: 'Malgun Gothic', sans-serif;
-    background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
     padding: 15px;
     display: flex;
     justify-content: center;
+    min-height: 100vh;
+    box-sizing: border-box;
+    /* 스크립트가 로드되기 전 기본 배경 (부드러운 그레이) */
+    background: #f5f7fa; 
+    transition: background 1s ease; /* 배경이 바뀔 때 부드럽게 애니메이션 */
 }
 
 .container {
@@ -24,11 +26,15 @@ body {
 header {
     text-align: center;
     margin-bottom: 20px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 15px;
+    backdrop-filter: blur(5px); /* 뒤 배경이 살짝 흐리게 비치는 효과 */
 }
 
-h1 { margin-bottom: 5px; color: var(--primary-color); font-size: 1.8rem; }
-#temp-display { font-size: 2.2rem; font-weight: bold; display: block; margin-top: 5px; }
-#rain-display { display: block; color: #2b7de2; font-size: 0.9rem; margin-top: 3px; font-weight: bold; }
+h1 { margin: 0 0 5px 0; color: #1a365d; font-size: 1.6rem; }
+#temp-display { font-size: 2.5rem; font-weight: bold; display: block; margin-top: 5px; }
+#rain-display { display: block; color: #1d4ed8; font-size: 0.95rem; margin-top: 5px; font-weight: bold; }
 
 /* 탭 스타일 */
 .tab-container {
@@ -41,17 +47,18 @@ h1 { margin-bottom: 5px; color: var(--primary-color); font-size: 1.8rem; }
     flex: 1;
     padding: 12px;
     border: none;
-    background: #e4e8ee;
+    background: rgba(255, 255, 255, 0.6);
     font-size: 1rem;
     font-weight: bold;
-    color: #666;
+    color: #4a5568;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
+    backdrop-filter: blur(5px);
 }
 
 .tab-btn.active {
-    background: var(--primary-color);
+    background: #2563eb;
     color: white;
 }
 
@@ -60,12 +67,13 @@ section {
     border-radius: 12px;
     padding: 15px;
     margin-bottom: 15px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    backdrop-filter: blur(10px); /* 카드 뒤로 하늘 배경이 은은하게 비침 */
 }
 
-h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
+h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid rgba(0,0,0,0.05); padding-bottom: 8px; }
 
-/* 2열 4행 복장 표 스타일 */
+/* 복장 표 스타일 */
 .outfit-table {
     width: 100%;
     border-collapse: collapse;
@@ -74,20 +82,18 @@ h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; paddin
 
 .outfit-table th {
     width: 25%;
-    background-color: #f1f3f7;
-    color: #444;
+    background-color: rgba(0, 0, 0, 0.03);
+    color: #2d3748;
     padding: 12px 10px;
     border: 1px solid var(--border-color);
     font-weight: bold;
-    text-align: center;
 }
 
 .outfit-table td {
     padding: 12px 15px;
     border: 1px solid var(--border-color);
-    color: #111;
+    color: #1a202c;
     font-weight: 500;
-    background: #fff;
 }
 
 /* 그래프 가로 스크롤 영역 */
@@ -96,35 +102,21 @@ h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; paddin
     overflow-x: auto;
     position: relative;
     -webkit-overflow-scrolling: touch;
-    border-radius: 8px; /* 모서리 부드럽게 */
+    border-radius: 8px;
 }
 
-/* 0시~24시 데이터를 여유 있게 보여주기 위해 캔버스 가로폭 고정 */
 .chart-inner-canvas {
     width: 850px; 
-    height: 230px;
+    height: 200px;
     position: relative;
 }
 
-/* 실제 차트가 그려질 캔버스 */
 #tempChart {
     position: absolute;
     top: 0;
     left: 0;
     width: 100% !important;
     height: 100% !important;
-    z-index: 2;
-}
-
-/* 일출/일몰 배경을 담당할 그라데이션 레이어 */
-.chart-bg-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    pointer-events: none;
 }
 
 /* 주간 예보 표 */
@@ -136,8 +128,8 @@ h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; paddin
 }
 
 .forecast-table th, .forecast-table td {
-    padding: 8px;
-    border-bottom: 1px solid #eee;
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
-.forecast-table th { color: #777; font-weight: normal; }
+.forecast-table th { color: #718096; font-weight: normal; }
