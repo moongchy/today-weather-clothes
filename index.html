@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘 뭐 입지? - 라이브 날씨 옷차림</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👕 오늘 뭐 입지?</h1>
+            <p id="location">위치 정보 가져오는 중...</p>
+            <div id="current-weather">
+                <span id="temp-display">--°C</span>
+                <span id="weather-desc">날씨 정보 로딩...</span>
+            </div>
+        </header>
+
+        <section class="outfit-section">
+            <h2> 오늘의 추천 옷차림</h2>
+            <div class="outfit-grid">
+                <div class="outfit-card">
+                    <span class="icon">🧥</span>
+                    <h3>외투</h3>
+                    <p id="outfit-outer">-</p>
+                </div>
+                <div class="outfit-card">
+                    <span class="icon">👕</span>
+                    <h3>상의</h3>
+                    <p id="outfit-top">-</p>
+                </div>
+                <div class="outfit-card">
+                    <span class="icon">👖</span>
+                    <h3>하의</h3>
+                    <p id="outfit-bottom">-</p>
+                </div>
+                <div class="outfit-card">
+                    <span class="icon">🧣</span>
+                    <h3>기타/복합</h3>
+                    <p id="outfit-etc">-</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="graph-section">
+            <h2>📈 시간대별 기온 변화 (오늘)</h2>
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </section>
+
+        <section class="forecast-section">
+            <h2>📅 주간 날씨 예보</h2>
+            <table class="forecast-table">
+                <thead>
+                    <tr>
+                        <th>날짜</th>
+                        <th>날씨</th>
+                        <th>최저 기온</th>
+                        <th>최고 기온</th>
+                    </tr>
+                </thead>
+                <tbody id="forecast-body">
+                    </tbody>
+            </table>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
