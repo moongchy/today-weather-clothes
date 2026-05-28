@@ -1,4 +1,3 @@
-// 기온별 복장 데이터 구조
 const outfitData = [
     { max: Infinity, min: 28, outer: "-", top: "민소매, 반팔 티셔츠", bottom: "반바지(핫팬츠), 짧은 치마", etc: "민소매 원피스, 린넨 재질 옷" },
     { max: 27, min: 23, outer: "-", top: "반팔 티셔츠, 얇은 셔츠, 얇은 긴팔 티셔츠", bottom: "반바지, 면바지", etc: "-" },
@@ -14,11 +13,9 @@ let globalWeatherData = null;
 let currentTab = 'today';
 let myChart = null;
 
-// 복장 테이블 갱신 함수
 function recommendOutfit(temp) {
     const roundedTemp = Math.round(temp);
     const recommendation = outfitData.find(item => roundedTemp >= item.min && roundedTemp <= item.max);
-    
     if (recommendation) {
         document.getElementById('outfit-outer').innerText = recommendation.outer;
         document.getElementById('outfit-top').innerText = recommendation.top;
@@ -27,12 +24,10 @@ function recommendOutfit(temp) {
     }
 }
 
-// 초기 로드
 async function initApp() {
     try {
         const responseText = await fetch('api.txt');
         const apiKey = (await responseText.text()).trim();
-
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
                 getWeatherData(position.coords.latitude, position.coords.longitude, apiKey);
@@ -41,60 +36,49 @@ async function initApp() {
     } catch (e) { console.error(e); }
 }
 
-// API 호출
 async function getWeatherData(lat, lon, apiKey) {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=kr`;
     try {
         const response = await fetch(url);
         globalWeatherData = await response.json();
-        
         document.getElementById('location').innerText = `📍 ${globalWeatherData.city.name}`;
-        
-        // 데이터 파싱 후 화면 그리기
         renderPage();
         renderForecastTable(globalWeatherData.list);
     } catch (e) { console.error(e); }
 }
 
-// 오늘 vs 내일 데이터 필터링 기능 및 UI 업데이트 핵심
 function renderPage() {
     if (!globalWeatherData) return;
 
     const list = globalWeatherData.list;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const tomorrowObj = new Date();
-    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
-
-    const targetDateStr = (currentTab === 'today') ? todayStr : tomorrowStr;
     
-    // 해당 날짜에 속하는 3시간 단위 데이터들 추출 (0시 ~ 24시 포괄)
+    // 타겟 날짜 계산 (로컬 시간 기준 자정 세팅)
+    const targetDate = new Date();
+    if (currentTab === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
+    const targetStr = targetDate.toLocaleDateString('sv'); // YYYY-MM-DD 포맷 안전하게 추출
+
+    // 1. 해당 날짜의 데이터만 정확히 필터링 (0시~24시 포괄)
     const dayDataList = list.filter(item => {
-        const itemDateStr = new Date(item.dt * 1000).toISOString().split('T')[0];
-        return itemDateStr === targetDateStr;
+        const itemDateStr = new Date(item.dt * 1000).toLocaleDateString('sv');
+        return itemDateStr === targetStr;
     });
 
     if(dayDataList.length === 0) return;
 
-    // 대표 메인 날씨 세팅 (가장 첫 시간대 기준)
     const mainData = dayDataList[0];
     document.getElementById('temp-display').innerText = `${Math.round(mainData.main.temp)}°C`;
     document.getElementById('weather-desc').innerText = mainData.weather[0].description;
     
-    // 강수량 및 강수확률 파악
-    const pop = mainData.pop ? Math.round(mainData.pop * 100) : 0; // 강수확률 (0~1)
+    const pop = mainData.pop ? Math.round(mainData.pop * 100) : 0;
     const rain = mainData.rain ? (mainData.rain['3h'] || 0) : (mainData.snow ? (mainData.snow['3h'] || 0) : 0);
     document.getElementById('rain-display').innerText = `💧 강수확률: ${pop}% ${rain > 0 ? `(예상 강수량: ${rain}mm)` : ''}`;
 
-    // 복장 추천 표 업데이트
     recommendOutfit(mainData.main.temp);
-
-    // 제목 업데이트 및 그래프 빌드
     document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
+    
     buildChart(dayDataList);
 }
 
-// 탭 전환 처리
 function switchDay(day) {
     currentTab = day;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -102,75 +86,114 @@ function switchDay(day) {
     renderPage();
 }
 
-// Chart.js 그래프 생성 및 스크롤 제어
+// 3. 일출/일몰 그라데이션 배경을 입힌 시간대별 고정 그래프 생성
 function buildChart(dayData) {
     const ctx = document.getElementById('tempChart').getContext('2d');
+    const chartWrapper = document.getElementById('chartWrapper');
     
-    const labels = dayData.map(item => {
-        const date = new Date(item.dt * 1000);
-        return `${date.getHours()}시`;
-    });
+    const labels = dayData.map(item => `${new Date(item.dt * 1000).getHours()}시`);
     const temps = dayData.map(item => Math.round(item.main.temp));
-    
-    // 툴팁이나 축 정보에 보여줄 강수 표기용 어레이
     const rainInfos = dayData.map(item => {
         const pop = item.pop ? Math.round(item.pop * 100) : 0;
         return pop > 0 ? `☔${pop}%` : '';
     });
 
-    if (myChart) myChart.destroy(); // 기존 차트가 있다면 초기화
+    // API에서 제공하는 오늘 기준 일출/일몰 시각 파악 (기본값 설정)
+    const sunriseHour = globalWeatherData.city.sunrise ? new Date(globalWeatherData.city.sunrise * 1000).getHours() : 6;
+    const sunsetHour = globalWeatherData.city.sunset ? new Date(globalWeatherData.city.sunset * 1000).getHours() : 19;
+
+    // 그래프 배경 가로형 그라데이션 객체 생성 (0px부터 850px 끝까지)
+    const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
+    
+    // 시간축 비율 계산용 (0시=0, 24시=1)
+    const startHour = new Date(dayData[0].dt * 1000).getHours();
+    const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
+    const totalDuration = endHour - startHour || 24;
+
+    const getStopPosition = (hour) => {
+        const pos = (hour - startHour) / totalDuration;
+        return Math.max(0, Math.min(1, pos)); // 0과 1 사이로 패킹
+    };
+
+    const sunriseStop = getStopPosition(sunriseHour);
+    const sunsetStop = getStopPosition(sunsetHour);
+
+    // 일출 전 (어두운 새벽) -> 일출 후 (따뜻한 아침) -> 낮 (화창) -> 일몰 (노을) -> 일몰 후 (밤) 순격 매칭
+    backgroundGradient.addColorStop(0, '#1e2530'); 
+    if(sunriseStop > 0 && sunriseStop < 1) {
+        backgroundGradient.addColorStop(Math.max(0, sunriseStop - 0.05), '#232d3d');
+        backgroundGradient.addColorStop(sunriseStop, '#fef3c7'); // 일출 지점 가스펠 컬러
+        backgroundGradient.addColorStop(Math.min(1, sunriseStop + 0.05), '#fff7ed');
+    }
+    if(sunsetStop > 0 && sunsetStop < 1) {
+        backgroundGradient.addColorStop(Math.max(0, sunsetStop - 0.05), '#fff7ed');
+        backgroundGradient.addColorStop(sunsetStop, '#ffedd5'); // 일몰 노을 빛
+        backgroundGradient.addColorStop(Math.min(1, sunsetStop + 0.05), '#111827');
+    }
+    backgroundGradient.addColorStop(1, '#0f172a');
+
+    if (myChart) myChart.destroy();
 
     myChart = new Chart(ctx, {
         type: 'line',
-        plugins: [ChartDataLabels], // 데이터 레이블 플러그인 장착
+        plugins: [ChartDataLabels],
         data: {
             labels: labels,
             datasets: [{
-                label: '기온 (°C)',
+                label: '기온',
                 data: temps,
-                borderColor: '#4a90e2',
-                backgroundColor: 'rgba(74, 144, 226, 0.08)',
-                fill: true,
+                borderColor: '#ffffff', // 배경 구분을 명확히 하기 위해 흰색 선 처리
+                borderWidth: 3,
+                backgroundColor: 'transparent', 
+                fill: false,
                 tension: 0.3,
-                pointRadius: 5,
-                pointHoverRadius: 7
+                pointRadius: 6,
+                pointBackgroundColor: '#4a90e2',
+                pointBorderColor: '#ffffff'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { top: 25, bottom: 10, left: 15, right: 15 } },
-            scales: {
-                y: { display: false, grid: { display: false } }, // 숫자가 보이니까 y축선 과감히 생략
-                x: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' } } }
-            },
+            // 일출/일몰 배경을 입히기 위해 플러그인 영역에 배경 주입
             plugins: {
                 legend: { display: false },
-                // 수치 표기 플러그인 상세 설정
                 datalabels: {
                     align: 'top',
                     anchor: 'end',
                     offset: 4,
                     font: { weight: 'bold', size: 12 },
-                    color: '#333',
-                    formatter: function(value, context) {
-                        const rainText = rainInfos[context.dataIndex];
-                        return `${value}°C\n${rainText}`; // 온도가 나오고 그 아래 강수 정보 노출
-                    }
+                    color: '#ffffff', // 어두운 배경 영역에서도 잘 보이게 화이트 텍스트
+                    formatter: (value, context) => `${value}°C\n${rainInfos[context.dataIndex]}`
+                }
+            },
+            scales: {
+                y: { display: false },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } }
                 }
             }
-        }
+        },
+        // 차트 뒤 백그라운드 색상 그라데이션 채우기 플러그인 커스텀 삽입
+        plugins: [{
+            id: 'custom_canvas_background_color',
+            beforeDraw: (chart) => {
+                const {ctx, canvas} = chart;
+                ctx.save();
+                ctx.fillStyle = backgroundGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+        }]
     });
 
-    // 9시~18시가 화면 중앙 부근에 오도록 가로 스크롤 포커스 자동 조절
+    // 8시 반 ~ 18시 반 정중앙 포커스용 정밀 스크롤 제어 수치
     setTimeout(() => {
-        const wrapper = document.getElementById('chartWrapper');
-        // 전체 850px 기온 그래프 레이아웃 중 대략 9시 지점(중간 앞쪽)으로 스크롤 이동
-        wrapper.scrollLeft = 220; 
+        chartWrapper.scrollLeft = 245; 
     }, 100);
 }
 
-// 하단 주간 예보 표 생성
 function renderForecastTable(allData) {
     const tbody = document.getElementById('forecast-body');
     tbody.innerHTML = '';
@@ -179,7 +202,6 @@ function renderForecastTable(allData) {
     dailyData.forEach(item => {
         const date = new Date(item.dt * 1000);
         const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
-        
         const row = `
             <tr>
                 <td><strong>${dayStr}</strong></td>
