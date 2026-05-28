@@ -51,21 +51,33 @@ function renderPage() {
     if (!globalWeatherData) return;
 
     const list = globalWeatherData.list;
+    const today = new Date();
     
-    // 타겟 날짜 계산 (로컬 시간 기준 자정 세팅)
+    // 타겟 날짜 설정
     const targetDate = new Date();
-    if (currentTab === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
-    const targetStr = targetDate.toLocaleDateString('sv'); // YYYY-MM-DD 포맷 안전하게 추출
+    if (currentTab === 'tomorrow') targetDate.setDate(today.getDate() + 1);
+    const targetStr = targetDate.toLocaleDateString('sv'); // YYYY-MM-DD 포맷 안전 추출
 
-    // 1. 해당 날짜의 데이터만 정확히 필터링 (0시~24시 포괄)
-    const dayDataList = list.filter(item => {
+    // 해당 날짜 데이터 필터링
+    let dayDataList = list.filter(item => {
         const itemDateStr = new Date(item.dt * 1000).toLocaleDateString('sv');
         return itemDateStr === targetStr;
     });
 
-    if(dayDataList.length === 0) return;
+    // 만약 오늘 데이터가 밤 시간대 접속으로 인해 몇 개 없다면, 유저가 보기 편하게 직전 데이터라도 붙여서 시간축을 보정합니다.
+    if (currentTab === 'today' && dayDataList.length < 8) {
+        const remainingNeeded = 8 - dayDataList.length;
+        const previousData = list.filter(item => {
+            const itemDateStr = new Date(item.dt * 1000).toLocaleDateString('sv');
+            return itemDateStr < targetStr;
+        }).slice(-remainingNeeded);
+        dayDataList = [...previousData, ...dayDataList];
+    }
 
-    const mainData = dayDataList[0];
+    if (dayDataList.length === 0) return;
+
+    // 현재 기온 메인 세팅 (오늘 탭이면 가장 첫 데이터, 내일이면 내일의 첫 데이터)
+    const mainData = currentTab === 'today' ? list[0] : dayDataList[0];
     document.getElementById('temp-display').innerText = `${Math.round(mainData.main.temp)}°C`;
     document.getElementById('weather-desc').innerText = mainData.weather[0].description;
     
@@ -86,9 +98,9 @@ function switchDay(day) {
     renderPage();
 }
 
-// 3. 일출/일몰 그라데이션 배경을 입힌 시간대별 고정 그래프 생성
 function buildChart(dayData) {
-    const ctx = document.getElementById('tempChart').getContext('2d');
+    const canvas = document.getElementById('tempChart');
+    const ctx = canvas.getContext('2d');
     const chartWrapper = document.getElementById('chartWrapper');
     
     const labels = dayData.map(item => `${new Date(item.dt * 1000).getHours()}시`);
@@ -98,120 +110,24 @@ function buildChart(dayData) {
         return pop > 0 ? `☔${pop}%` : '';
     });
 
-    // API에서 제공하는 오늘 기준 일출/일몰 시각 파악 (기본값 설정)
+    // 안전하게 그라데이션 객체 정의
+    const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
+    
+    const startHour = new Date(dayData[0].dt * 1000).getHours();
+    const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
+    
+    // 시간 역전이나 나누기 0 에러 차단 분기문
+    let totalDuration = endHour - startHour;
+    if (totalDuration <= 0) totalDuration = 24;
+
     const sunriseHour = globalWeatherData.city.sunrise ? new Date(globalWeatherData.city.sunrise * 1000).getHours() : 6;
     const sunsetHour = globalWeatherData.city.sunset ? new Date(globalWeatherData.city.sunset * 1000).getHours() : 19;
 
-    // 그래프 배경 가로형 그라데이션 객체 생성 (0px부터 850px 끝까지)
-    const backgroundGradient = ctx.createLinearGradient(0, 0, 850, 0);
-    
-    // 시간축 비율 계산용 (0시=0, 24시=1)
-    const startHour = new Date(dayData[0].dt * 1000).getHours();
-    const endHour = new Date(dayData[dayData.length - 1].dt * 1000).getHours();
-    const totalDuration = endHour - startHour || 24;
-
     const getStopPosition = (hour) => {
-        const pos = (hour - startHour) / totalDuration;
-        return Math.max(0, Math.min(1, pos)); // 0과 1 사이로 패킹
+        let pos = (hour - startHour) / totalDuration;
+        if (pos < 0) pos += 1; // 시간 오버플로우 방지
+        return Math.max(0, Math.min(1, pos));
     };
 
     const sunriseStop = getStopPosition(sunriseHour);
-    const sunsetStop = getStopPosition(sunsetHour);
-
-    // 일출 전 (어두운 새벽) -> 일출 후 (따뜻한 아침) -> 낮 (화창) -> 일몰 (노을) -> 일몰 후 (밤) 순격 매칭
-    backgroundGradient.addColorStop(0, '#1e2530'); 
-    if(sunriseStop > 0 && sunriseStop < 1) {
-        backgroundGradient.addColorStop(Math.max(0, sunriseStop - 0.05), '#232d3d');
-        backgroundGradient.addColorStop(sunriseStop, '#fef3c7'); // 일출 지점 가스펠 컬러
-        backgroundGradient.addColorStop(Math.min(1, sunriseStop + 0.05), '#fff7ed');
-    }
-    if(sunsetStop > 0 && sunsetStop < 1) {
-        backgroundGradient.addColorStop(Math.max(0, sunsetStop - 0.05), '#fff7ed');
-        backgroundGradient.addColorStop(sunsetStop, '#ffedd5'); // 일몰 노을 빛
-        backgroundGradient.addColorStop(Math.min(1, sunsetStop + 0.05), '#111827');
-    }
-    backgroundGradient.addColorStop(1, '#0f172a');
-
-    if (myChart) myChart.destroy();
-
-    myChart = new Chart(ctx, {
-        type: 'line',
-        plugins: [ChartDataLabels],
-        data: {
-            labels: labels,
-            datasets: [{
-                label: '기온',
-                data: temps,
-                borderColor: '#ffffff', // 배경 구분을 명확히 하기 위해 흰색 선 처리
-                borderWidth: 3,
-                backgroundColor: 'transparent', 
-                fill: false,
-                tension: 0.3,
-                pointRadius: 6,
-                pointBackgroundColor: '#4a90e2',
-                pointBorderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            // 일출/일몰 배경을 입히기 위해 플러그인 영역에 배경 주입
-            plugins: {
-                legend: { display: false },
-                datalabels: {
-                    align: 'top',
-                    anchor: 'end',
-                    offset: 4,
-                    font: { weight: 'bold', size: 12 },
-                    color: '#ffffff', // 어두운 배경 영역에서도 잘 보이게 화이트 텍스트
-                    formatter: (value, context) => `${value}°C\n${rainInfos[context.dataIndex]}`
-                }
-            },
-            scales: {
-                y: { display: false },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } }
-                }
-            }
-        },
-        // 차트 뒤 백그라운드 색상 그라데이션 채우기 플러그인 커스텀 삽입
-        plugins: [{
-            id: 'custom_canvas_background_color',
-            beforeDraw: (chart) => {
-                const {ctx, canvas} = chart;
-                ctx.save();
-                ctx.fillStyle = backgroundGradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.restore();
-            }
-        }]
-    });
-
-    // 8시 반 ~ 18시 반 정중앙 포커스용 정밀 스크롤 제어 수치
-    setTimeout(() => {
-        chartWrapper.scrollLeft = 245; 
-    }, 100);
-}
-
-function renderForecastTable(allData) {
-    const tbody = document.getElementById('forecast-body');
-    tbody.innerHTML = '';
-    const dailyData = allData.filter((item, index) => index % 8 === 0);
-
-    dailyData.forEach(item => {
-        const date = new Date(item.dt * 1000);
-        const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
-        const row = `
-            <tr>
-                <td><strong>${dayStr}</strong></td>
-                <td>${item.weather[0].description}</td>
-                <td style="color: #4a90e2">${Math.round(item.main.temp_min)}°C</td>
-                <td style="color: #e24a4a">${Math.round(item.main.temp_max)}°C</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
-}
-
-initApp();
+    const sunsetStop = getStopPosition(sunsetHour
