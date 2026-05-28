@@ -1,4 +1,4 @@
-// 1. 제공해주신 기온별 복장 데이터 세팅
+// 기온별 복장 데이터 구조
 const outfitData = [
     { max: Infinity, min: 28, outer: "-", top: "민소매, 반팔 티셔츠", bottom: "반바지(핫팬츠), 짧은 치마", etc: "민소매 원피스, 린넨 재질 옷" },
     { max: 27, min: 23, outer: "-", top: "반팔 티셔츠, 얇은 셔츠, 얇은 긴팔 티셔츠", bottom: "반바지, 면바지", etc: "-" },
@@ -10,7 +10,11 @@ const outfitData = [
     { max: 4, min: -Infinity, outer: "패딩, 두꺼운 코트", top: "-", bottom: "-", etc: "누빔, 내복, 목도리, 장갑, 기모, 방한용품" }
 ];
 
-// 복장 추천 함수
+let globalWeatherData = null;
+let currentTab = 'today';
+let myChart = null;
+
+// 복장 테이블 갱신 함수
 function recommendOutfit(temp) {
     const roundedTemp = Math.round(temp);
     const recommendation = outfitData.find(item => roundedTemp >= item.min && roundedTemp <= item.max);
@@ -23,123 +27,153 @@ function recommendOutfit(temp) {
     }
 }
 
-// 2. 로컬의 api.txt에서 API KEY 불러오기 후 날씨 데이터 가져오기
+// 초기 로드
 async function initApp() {
     try {
-        // 로컬에서 테스트할 때는 같은 폴더의 api.txt를 읽어옵니다.
         const responseText = await fetch('api.txt');
         const apiKey = (await responseText.text()).trim();
 
-        if (!apiKey) throw new Error("API Key가 api.txt에 없습니다.");
-
-        // GPS 위치 가져오기
-        // app.js의 이 부분을 찾아 아래 코드로 교체해 주세요!
-if (navigator.geolocation) {
-    // iOS Safari 안정성을 위한 옵션 설정
-    const geoOptions = {
-        enableHighAccuracy: false, // true로 하면 아이폰이 GPS 잡느라 너무 오래 걸려서 뻗을 수 있음
-        timeout: 5000,             // 5초 안에 못 가져오면 에러 던지기
-        maximumAge: 60000          // 1분 이내에 캐싱된 위치 정보가 있다면 재사용
-    };
-
-    navigator.geolocation.getCurrentPosition(
-        position => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            getWeatherData(lat, lon, apiKey);
-        }, 
-        error => {
-            // 아이폰에서 어떤 에러가 나는지 구체적으로 확인하기 위한 알림창
-            console.error("GPS 에러 상세:", error);
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    alert("위치 권한 요청이 거부되었습니다. 설정 -> Safari -> 위치에서 허용해 주세요.");
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    alert("위치 정보를 사용할 수 없습니다. (GPS 신호 약함 또는 꺼짐)");
-                    break;
-                case error.TIMEOUT:
-                    alert("위치 정보를 가져오는 시간이 초과되었습니다. 다시 시도해 주세요.");
-                    break;
-                default:
-                    alert("위치 오류 발생: " + error.message);
-                    break;
-            }
-        },
-        geoOptions
-    );
-} else {
-    alert("이 브라우저에서는 GPS를 지원하지 않습니다.");
-}
-    } catch (error) {
-        console.error("초기화 실패:", error);
-        document.getElementById('weather-desc').innerText = "API 로드 실패";
-    }
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                getWeatherData(position.coords.latitude, position.coords.longitude, apiKey);
+            }, () => alert("위치 권한을 허용해 주세요."));
+        }
+    } catch (e) { console.error(e); }
 }
 
-// 3. OpenWeatherMap API 호출 (현재날씨 및 5일 예보 모두 수집 가능한 5 day/3 hour 예보 API 사용)
+// API 호출
 async function getWeatherData(lat, lon, apiKey) {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=kr`;
-
     try {
         const response = await fetch(url);
-        const data = await response.json();
+        globalWeatherData = await response.json();
         
-        // 현재 지역명 및 현재 기온 설정 (가장 첫 번째 예보 데이터를 현재 데이터 대용으로 활용)
-        const currentData = data.list[0];
-        document.getElementById('location').innerText = `📍 ${data.city.name}`;
-        document.getElementById('temp-display').innerText = `${Math.round(currentData.main.temp)}°C`;
-        document.getElementById('weather-desc').innerText = currentData.weather[0].description;
-
-        // 복장 추천 실행
-        recommendOutfit(currentData.main.temp);
-
-        // 그래프 및 주간 표 그리기
-        renderChart(data.list.slice(0, 8)); // 향후 24시간 (3시간 단위 8개)
-        renderForecastTable(data.list);
-
-    } catch (error) {
-        console.error("날씨 불러오기 실패:", error);
-    }
+        document.getElementById('location').innerText = `📍 ${globalWeatherData.city.name}`;
+        
+        // 데이터 파싱 후 화면 그리기
+        renderPage();
+        renderForecastTable(globalWeatherData.list);
+    } catch (e) { console.error(e); }
 }
 
-// 4. Chart.js 그래프 그리기
-function renderChart(hourlyData) {
+// 오늘 vs 내일 데이터 필터링 기능 및 UI 업데이트 핵심
+function renderPage() {
+    if (!globalWeatherData) return;
+
+    const list = globalWeatherData.list;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrowObj = new Date();
+    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+
+    const targetDateStr = (currentTab === 'today') ? todayStr : tomorrowStr;
+    
+    // 해당 날짜에 속하는 3시간 단위 데이터들 추출 (0시 ~ 24시 포괄)
+    const dayDataList = list.filter(item => {
+        const itemDateStr = new Date(item.dt * 1000).toISOString().split('T')[0];
+        return itemDateStr === targetDateStr;
+    });
+
+    if(dayDataList.length === 0) return;
+
+    // 대표 메인 날씨 세팅 (가장 첫 시간대 기준)
+    const mainData = dayDataList[0];
+    document.getElementById('temp-display').innerText = `${Math.round(mainData.main.temp)}°C`;
+    document.getElementById('weather-desc').innerText = mainData.weather[0].description;
+    
+    // 강수량 및 강수확률 파악
+    const pop = mainData.pop ? Math.round(mainData.pop * 100) : 0; // 강수확률 (0~1)
+    const rain = mainData.rain ? (mainData.rain['3h'] || 0) : (mainData.snow ? (mainData.snow['3h'] || 0) : 0);
+    document.getElementById('rain-display').innerText = `💧 강수확률: ${pop}% ${rain > 0 ? `(예상 강수량: ${rain}mm)` : ''}`;
+
+    // 복장 추천 표 업데이트
+    recommendOutfit(mainData.main.temp);
+
+    // 제목 업데이트 및 그래프 빌드
+    document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
+    buildChart(dayDataList);
+}
+
+// 탭 전환 처리
+function switchDay(day) {
+    currentTab = day;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    renderPage();
+}
+
+// Chart.js 그래프 생성 및 스크롤 제어
+function buildChart(dayData) {
     const ctx = document.getElementById('tempChart').getContext('2d');
     
-    const labels = hourlyData.map(item => {
+    const labels = dayData.map(item => {
         const date = new Date(item.dt * 1000);
         return `${date.getHours()}시`;
     });
-    const temps = hourlyData.map(item => Math.round(item.main.temp));
+    const temps = dayData.map(item => Math.round(item.main.temp));
+    
+    // 툴팁이나 축 정보에 보여줄 강수 표기용 어레이
+    const rainInfos = dayData.map(item => {
+        const pop = item.pop ? Math.round(item.pop * 100) : 0;
+        return pop > 0 ? `☔${pop}%` : '';
+    });
 
-    new Chart(ctx, {
+    if (myChart) myChart.destroy(); // 기존 차트가 있다면 초기화
+
+    myChart = new Chart(ctx, {
         type: 'line',
+        plugins: [ChartDataLabels], // 데이터 레이블 플러그인 장착
         data: {
             labels: labels,
             datasets: [{
                 label: '기온 (°C)',
                 data: temps,
                 borderColor: '#4a90e2',
-                backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                backgroundColor: 'rgba(74, 144, 226, 0.08)',
                 fill: true,
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 5,
+                pointHoverRadius: 7
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { display: true } }
+            layout: { padding: { top: 25, bottom: 10, left: 15, right: 15 } },
+            scales: {
+                y: { display: false, grid: { display: false } }, // 숫자가 보이니까 y축선 과감히 생략
+                x: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' } } }
+            },
+            plugins: {
+                legend: { display: false },
+                // 수치 표기 플러그인 상세 설정
+                datalabels: {
+                    align: 'top',
+                    anchor: 'end',
+                    offset: 4,
+                    font: { weight: 'bold', size: 12 },
+                    color: '#333',
+                    formatter: function(value, context) {
+                        const rainText = rainInfos[context.dataIndex];
+                        return `${value}°C\n${rainText}`; // 온도가 나오고 그 아래 강수 정보 노출
+                    }
+                }
+            }
         }
     });
+
+    // 9시~18시가 화면 중앙 부근에 오도록 가로 스크롤 포커스 자동 조절
+    setTimeout(() => {
+        const wrapper = document.getElementById('chartWrapper');
+        // 전체 850px 기온 그래프 레이아웃 중 대략 9시 지점(중간 앞쪽)으로 스크롤 이동
+        wrapper.scrollLeft = 220; 
+    }, 100);
 }
 
-// 5. 주간 날씨 표 채우기 (하루에 한 개씩 대표 데이터만 추출)
+// 하단 주간 예보 표 생성
 function renderForecastTable(allData) {
     const tbody = document.getElementById('forecast-body');
     tbody.innerHTML = '';
-
-    // 일별 최고/최저 기온 그룹화 생략 후 간단히 24시간 간격(8개마다)으로 추출하는 방식
     const dailyData = allData.filter((item, index) => index % 8 === 0);
 
     dailyData.forEach(item => {
@@ -148,15 +182,14 @@ function renderForecastTable(allData) {
         
         const row = `
             <tr>
-                <td>${dayStr}</td>
+                <td><strong>${dayStr}</strong></td>
                 <td>${item.weather[0].description}</td>
-                <td>${Math.round(item.main.temp_min)}°C</td>
-                <td>${Math.round(item.main.temp_max)}°C</td>
+                <td style="color: #4a90e2">${Math.round(item.main.temp_min)}°C</td>
+                <td style="color: #e24a4a">${Math.round(item.main.temp_max)}°C</td>
             </tr>
         `;
         tbody.innerHTML += row;
     });
 }
 
-// 앱 실행
 initApp();
