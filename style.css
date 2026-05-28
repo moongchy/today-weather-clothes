@@ -74,7 +74,6 @@ h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; paddin
 
 .outfit-table th {
     width: 25%;
-    background: #f8faof;
     background-color: #f1f3f7;
     color: #444;
     padding: 12px 10px;
@@ -94,15 +93,38 @@ h2 { font-size: 1.05rem; margin-top: 0; border-bottom: 2px solid #f0f0f0; paddin
 /* 그래프 가로 스크롤 영역 */
 .chart-scroll-container {
     width: 100%;
-    overflow-x: auto; /* 가로 스크롤 활성화 */
+    overflow-x: auto;
     position: relative;
     -webkit-overflow-scrolling: touch;
+    border-radius: 8px; /* 모서리 부드럽게 */
 }
 
-/* 0시~24시 데이터를 여유 있게 보여주기 위해 캔버스 가로폭을 넓게 고정 */
+/* 0시~24시 데이터를 여유 있게 보여주기 위해 캔버스 가로폭 고정 */
 .chart-inner-canvas {
     width: 850px; 
     height: 230px;
+    position: relative;
+}
+
+/* 실제 차트가 그려질 캔버스 */
+#tempChart {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 2;
+}
+
+/* 일출/일몰 배경을 담당할 그라데이션 레이어 */
+.chart-bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
 }
 
 /* 주간 예보 표 */
