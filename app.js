@@ -23,7 +23,6 @@ const weatherInfoMap = {
     95: { desc: "뇌우", icon: "⛈️", isRainy: true }
 };
 
-// 💡 [3번 답변] 옷차림 가이드 매핑 하이라이트 스크롤 유도
 function highlightOutfitTable(temp) {
     const roundedTemp = Math.round(temp);
     let targetRow = null;
@@ -31,6 +30,7 @@ function highlightOutfitTable(temp) {
     document.querySelectorAll('#outfit-rows tr').forEach(row => {
         const min = parseInt(row.getAttribute('data-min'));
         const max = parseInt(row.getAttribute('data-max'));
+        
         if (roundedTemp >= min && roundedTemp <= max) {
             row.classList.add('highlight');
             targetRow = row;
@@ -39,10 +39,19 @@ function highlightOutfitTable(temp) {
         }
     });
 
+    // 💡 스크롤 대상을 .table-responsive 박스로 정밀 타겟팅하여 맨 위 정렬
     if (targetRow) {
         setTimeout(() => {
-            targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
+            const container = document.querySelector('.table-responsive');
+            if (container) {
+                const targetOffsetTop = targetRow.offsetTop;
+                
+                container.scrollTo({
+                    top: targetOffsetTop, // 타겟 카드를 스크롤 영역 최상단으로 밀착
+                    behavior: 'smooth'
+                });
+            }
+        }, 150);
     }
 }
 
