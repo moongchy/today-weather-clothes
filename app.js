@@ -180,11 +180,45 @@ function renderPage() {
     }, 200); // 브라우저가 완전히 렌더링할 시간을 0.2초 확보
 }
 
-// 💡 [3번 답변] 시간 항목 임의 터치 시 스타일 토글 및 옷차림 새로 매핑 연동 함수
+// [수정 전] function selectHourlyTime(element, temp) { ... }
+// [수정 후] 아래 코드로 함수 전체를 교체해 주세요!
 function selectHourlyTime(element, temp) {
-    document.querySelectorAll('.hourly-item').forEach(item => item.classList.remove('selected'));
-    element.classList.add('selected');
-    highlightOutfitTable(temp);
+    // 1. 모든 시간 아이템에서 선택 효과 제거
+    document.querySelectorAll('.hourly-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // 2. 현재 클릭한 아이템에 선택 효과 적용
+    if (element) {
+        element.classList.add('selected');
+    }
+    
+    // 3. 기온에 맞춰 옷차림 가이드 행 하이라이트 및 스크롤 이동
+    const roundedTemp = Math.round(temp);
+    let targetRow = null;
+
+    document.querySelectorAll('#outfit-rows tr').forEach(row => {
+        const min = parseInt(row.getAttribute('data-min'));
+        const max = parseInt(row.getAttribute('data-max'));
+        
+        if (roundedTemp >= min && roundedTemp <= max) {
+            row.classList.add('highlight');
+            targetRow = row;
+        } else {
+            row.classList.remove('highlight');
+        }
+    });
+
+    // 4. 웹 브라우저 호환성을 고려한 옷차림 테이블 스크롤 이동
+    if (targetRow) {
+        setTimeout(() => {
+            targetRow.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest', // 다른 화면 요소를 침범하지 않고 테이블 안에서만 부드럽게 이동
+                inline: 'start'
+            });
+        }, 50);
+    }
 }
 
 function switchDay(day) {
