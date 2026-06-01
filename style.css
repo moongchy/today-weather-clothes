@@ -104,21 +104,125 @@ h2 { font-size: 0.9rem; margin: 0 0 14px 0; opacity: 0.8; font-weight: 600; text
 .hourly-pop { font-size: 0.72rem; color: #b6daf7; font-weight: 700; height: 14px; margin-bottom: 6px; }
 .hourly-temp { font-size: 1.05rem; font-weight: 600; }
 
-/* 3. 기온별 옷차림 표 모바일 스크롤 */
-.table-responsive { width: 100%; overflow-x: auto; border-radius: 10px; }
-.outfit-table { width: 100%; min-width: 500px; border-collapse: collapse; font-size: 0.85rem; }
-.outfit-table th { background: rgba(0, 0, 0, 0.12); padding: 10px; font-weight: 600; text-align: left; }
-.outfit-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); opacity: 0.85; }
-.temp-col { font-weight: bold; opacity: 1 !important; }
+/* style.css의 .table-responsive 및 .outfit-table 관련 부분을 모두 지우고 
+   아래 코드로 새로 붙여넣어 주세요. */
 
-/* 현재 온도 행 하이라이트 */
+.table-responsive { 
+    width: 100%; 
+    border-radius: 12px; 
+    overflow: hidden;
+}
+
+.outfit-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 0.88rem; 
+}
+
+/* 데스크톱 & 아이패드 기본 테이블 스타일 */
+.outfit-table th { 
+    background: rgba(0, 0, 0, 0.15); 
+    padding: 12px 10px; 
+    font-weight: 600; 
+    text-align: left; 
+}
+
+.outfit-table td { 
+    padding: 12px 10px; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+    opacity: 0.9; 
+}
+
+.temp-col { 
+    font-weight: bold; 
+    opacity: 1 !important; 
+}
+
+/* 데스크톱 & 아이패드 하이라이트 효과 */
 .outfit-table tr.highlight {
     background: #ffffff !important;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    transition: background 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
-.outfit-table tr.highlight td { color: #1e293b !important; font-weight: 600; opacity: 1; }
-.outfit-table tr.highlight .temp-col { color: #0284c7 !important; }
+.outfit-table tr.highlight td { 
+    color: #1e293b !important; 
+    font-weight: 600; 
+    opacity: 1; 
+}
+.outfit-table tr.highlight .temp-col { 
+    color: #0284c7 !important; 
+}
+
+
+/* 📱 [1번 피드백] 아이폰(모바일) 전용 가시성 극대화 레이아웃 변형 */
+@media (max-width: 767px) {
+    /* 테이블 헤더(기온, 외투, 상의...) 숨기기 */
+    .outfit-table thead { 
+        display: none; 
+    }
+    
+    /* 테이블 행(tr)을 하나의 독립된 카드 박스로 변환 */
+    .outfit-table tr {
+        display: block;
+        background: rgba(255, 255, 255, 0.08);
+        margin-bottom: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    /* 각 셀(td)을 세로로 나열하여 좌우 스크롤 원천 차단 */
+    .outfit-table td {
+        display: block;
+        padding: 4px 0;
+        border: none;
+        font-size: 0.85rem;
+        text-align: left;
+        opacity: 0.9;
+    }
+    
+    /* 데이터가 없는 빈 칸('-')은 화면 공간 차지를 줄이기 위해 숨김 처리 */
+    .outfit-table td:not(.temp-col):empty,
+    .outfit-table td:filter(text="-") {
+        display: none;
+    }
+
+    /* 첫 번째 셀(기온 타이틀) 강조 */
+    .outfit-table td.temp-col {
+        font-size: 0.95rem;
+        color: #fff;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    /* 💡 가시성 핵심: 각 기온 밑에 항목 이름(외투, 상의..)을 가상 요소로 주입 */
+    .outfit-table td:nth-child(2):not(:empty):not(:contains('-'))::before { content: "🧥 외투: "; font-weight: bold; color: rgba(255,255,255,0.7); }
+    .outfit-table td:nth-child(3):not(:empty):not(:contains('-'))::before { content: "👕 상의: "; font-weight: bold; color: rgba(255,255,255,0.7); }
+    .outfit-table td:nth-child(4):not(:empty):not(:contains('-'))::before { content: "👖 하의: "; font-weight: bold; color: rgba(255,255,255,0.7); }
+    .outfit-table td:nth-child(5):not(:empty):not(:contains('-'))::before { content: "👜 기타: "; font-weight: bold; color: rgba(255,255,255,0.7); }
+
+    /* 아이폰 현재 기온 카드 하이라이트 스타일 */
+    .outfit-table tr.highlight {
+        background: #ffffff !important;
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid #ffffff;
+    }
+    .outfit-table tr.highlight td { 
+        color: #334155 !important; 
+        opacity: 1; 
+    }
+    .outfit-table tr.highlight td.temp-col { 
+        color: #0284c7 !important; 
+        border-bottom: 1px solid rgba(2, 132, 199, 0.2);
+    }
+    /* 하이라이트 상태일 때 가상 글자 색상 변경 */
+    .outfit-table tr.highlight td:nth-child(2)::before { color: #64748b; }
+    .outfit-table tr.highlight td:nth-child(3)::before { color: #64748b; }
+    .outfit-table tr.highlight td:nth-child(4)::before { color: #64748b; }
+    .outfit-table tr.highlight td:nth-child(5)::before { color: #64748b; }
+}
 
 /* 4. 아이폰 순정 스타일 주간 레이아웃 */
 .forecast-row {
