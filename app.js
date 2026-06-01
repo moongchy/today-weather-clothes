@@ -161,15 +161,23 @@ function renderPage() {
         wrapper.innerHTML += itemHtml;
     });
 
-    // 💡 [1번 답변] 렌더링 완료 직후 '지금(현재 시간)' 카드가 스크롤창 맨 첫머리에 수평 배치되도록 제어
+// [수정 전] renderPage() 함수 맨 아래에 있던 setTimeout 부분을 찾아서...
+    // [수정 후] 아래 코드로 완전히 교체해 주세요!
     setTimeout(() => {
+        const wrapper = document.getElementById('hourlyWrapper');
         const focusTarget = document.getElementById('current-hour-focus');
+        
         if (focusTarget && currentTab === 'today') {
-            wrapper.scrollLeft = focusTarget.offsetLeft - wrapper.offsetLeft;
+            // 부모 컨테이너(wrapper)의 패딩과 스크롤 시작점을 계산하여 정확히 첫 번째에 배치
+            const offsetLeft = focusTarget.offsetLeft - wrapper.offsetLeft;
+            wrapper.scrollTo({
+                left: offsetLeft,
+                behavior: 'smooth'
+            });
         } else {
             wrapper.scrollLeft = 0;
         }
-    }, 100);
+    }, 200); // 브라우저가 완전히 렌더링할 시간을 0.2초 확보
 }
 
 // 💡 [3번 답변] 시간 항목 임의 터치 시 스타일 토글 및 옷차림 새로 매핑 연동 함수
