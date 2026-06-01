@@ -46,15 +46,33 @@ function highlightOutfitTable(temp) {
     }
 }
 
+// 1. app.js 내의 기존 initApp() 함수를 찾아서 이 코드로 교체해 주세요!
 function initApp() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            pos => getWeatherData(pos.coords.latitude, pos.coords.longitude),
-            () => getWeatherData(37.5665, 126.9780)
+            position => {
+                getWeatherData(position.coords.latitude, position.coords.longitude);
+            }, 
+            error => {
+                // 사용자가 위치 권한을 거부했거나 가져오지 못했을 때
+                console.log("위치 권한 거부됨:", error);
+                
+                // 기본값으로 서울 날씨를 먼저 보여주고
+                getWeatherData(37.5665, 126.9780); 
+                
+                // 💡 아이폰/사파리 유저를 위한 안내 팝업창을 띄웁니다.
+                // 일반 PC나 안드로이드에서도 직관적인 가이드를 위해 통합 제공되도록 설계했습니다.
+                document.getElementById('ios-location-modal').style.display = 'flex';
+            }
         );
     } else {
         getWeatherData(37.5665, 126.9780);
     }
+}
+
+// 2. app.js 아무 데나 이 함수를 새로 추가해 주세요! (확인 후 닫기 버튼 기능)
+function closeLocationModal() {
+    document.getElementById('ios-location-modal').style.display = 'none';
 }
 
 async function getWeatherData(lat, lon) {
