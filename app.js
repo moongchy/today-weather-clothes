@@ -1,14 +1,3 @@
-const outfitData = [
-    { max: Infinity, min: 28, outer: "-", top: "민소매, 반팔 티셔츠", bottom: "반바지(핫팬츠), 짧은 치마", etc: "민소매 원피스, 린넨 재질 옷" },
-    { max: 27, min: 23, outer: "-", top: "반팔 티셔츠, 얇은 셔츠, 얇은 긴팔 티셔츠", bottom: "반바지, 면바지", etc: "-" },
-    { max: 22, min: 20, outer: "얇은 가디건", top: "긴팔 티셔츠, 셔츠, 블라우스, 후드티", bottom: "면바지, 슬랙스, 7부 바지, 청바지", etc: "-" },
-    { max: 19, min: 17, outer: "얇은 니트, 얇은 가디건, 얇은 재킷, 바람막이", top: "후드티, 스웨트셔츠(맨투맨)", bottom: "긴바지, 청바지, 슬랙스, 스키니진", etc: "-" },
-    { max: 16, min: 12, outer: "재킷, 가디건, 야상", top: "스웨트셔츠(맨투맨), 셔츠, 기모 후드티", bottom: "청바지, 면바지", etc: "스타킹, 니트" },
-    { max: 11, min: 9, outer: "재킷, 야상, 점퍼, 트렌치 코트", top: "-", bottom: "청바지, 면바지, 검은색 스타킹, 기모 바지, 레이어드", etc: "니트" },
-    { max: 8, min: 5, outer: "(울)코트, 가죽 재킷", top: "-", bottom: "레깅스, 청바지, 두꺼운 바지, 기모", etc: "스카프, 플리스, 내복, 니트" },
-    { max: 4, min: -Infinity, outer: "패딩, 두꺼운 코트", top: "-", bottom: "-", etc: "누빔, 내복, 목도리, 장갑, 기모, 방한용품" }
-];
-
 let globalWeatherData = null;
 let currentTab = 'today';
 let myChart = null;
@@ -26,15 +15,25 @@ function getWeatherDesc(code) {
     return codes[code] || "흐림";
 }
 
-function recommendOutfit(temp) {
+// 🌟 [핵심 변경] 실시간 온도를 받아서 전체 표 중 매칭되는 행을 찾아 하이라이트 처리
+function highlightOutfitTable(temp) {
     const roundedTemp = Math.round(temp);
-    const recommendation = outfitData.find(item => roundedTemp >= item.min && roundedTemp <= item.max);
-    if (recommendation) {
-        document.getElementById('outfit-outer').innerText = recommendation.outer;
-        document.getElementById('outfit-top').innerText = recommendation.top;
-        document.getElementById('outfit-bottom').innerText = recommendation.bottom;
-        document.getElementById('outfit-etc').innerText = recommendation.etc;
-    }
+    const rows = document.querySelectorAll('#outfit-rows tr');
+    
+    rows.forEach(row => {
+        const min = parseInt(row.getAttribute('data-min'));
+        const max = parseInt(row.getAttribute('data-max'));
+        
+        if (roundedTemp >= min && roundedTemp <= max) {
+            row.classList.add('highlight');
+            // 모바일 유저를 위해 현재 매칭된 의상 정보 위치로 표를 자동 포커싱 이동
+            setTimeout(() => {
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+            }, 300);
+        } else {
+            row.classList.remove('highlight');
+        }
+    });
 }
 
 function initApp() {
@@ -42,7 +41,7 @@ function initApp() {
         navigator.geolocation.getCurrentPosition(position => {
             getWeatherData(position.coords.latitude, position.coords.longitude);
         }, () => {
-            getWeatherData(37.5665, 126.9780); // 서울 기본값
+            getWeatherData(37.5665, 126.9780); // 위치 거부 시 서울 기본값
         });
     }
 }
@@ -52,46 +51,34 @@ async function getWeatherData(lat, lon) {
     try {
         const response = await fetch(url);
         globalWeatherData = await response.json();
-        document.getElementById('location').innerText = `📍 현재 위치 영역`;
+        document.getElementById('location').innerText = `📍 고양시 인근 영역`;
         
-        // 사이트 전체 배경 먼저 실시간으로 적용
         updateSiteBackground();
-        
         renderPage();
         renderForecastTable(globalWeatherData.daily);
     } catch (e) { console.error(e); }
 }
 
-// 🌟 [추가] 실시간 일출/일몰 연동형 사이트 배경 전환 시스템
 function updateSiteBackground() {
     if (!globalWeatherData) return;
-
     const now = new Date();
     const currentHour = now.getHours();
 
-    // 오늘의 일출/일몰 시간 획득 (past_days=1 이므로 인덱스 1이 오늘)
     const sunriseStr = globalWeatherData.daily.sunrise[1];
     const sunsetStr = globalWeatherData.daily.sunset[1];
     const sunriseHour = sunriseStr ? new Date(sunriseStr).getHours() : 6;
     const sunsetHour = sunsetStr ? new Date(sunsetStr).getHours() : 19;
 
     let backgroundStyle = "";
-
     if (currentHour >= sunriseHour && currentHour < sunriseHour + 2) {
-        // 1. 아침 일출 시점 (은은한 새벽 노을빛 연청보라)
-        backgroundStyle = "linear-gradient(135deg, #ffafbd 0%, #ffc3a0 100%)";
+        backgroundStyle = "linear-gradient(180deg, #ffafbd 0%, #ffc3a0 100%)";
     } else if (currentHour >= sunriseHour + 2 && currentHour < sunsetHour - 1) {
-        // 2. 완전한 낮 (시원하고 화사한 스카이 블루)
-        backgroundStyle = "linear-gradient(135deg, #74ebe7 0%, #4a90e2 100%)";
+        backgroundStyle = "linear-gradient(180deg, #5097e6 0%, #2f73c4 100%)"; // 아이폰 순정 블루 느낌 최적화
     } else if (currentHour >= sunsetHour - 1 && currentHour <= sunsetHour + 1) {
-        // 3. 저녁 일몰 시점 (환상적인 핑크빛 보라 노을)
-        backgroundStyle = "linear-gradient(135deg, #ed4264 0%, #ffedbc 100%)";
+        backgroundStyle = "linear-gradient(180deg, #ed4264 0%, #ffedbc 100%)";
     } else {
-        // 4. 깊은 밤 (시크하고 깊이감 있는 은하수 네이비)
-        backgroundStyle = "linear-gradient(135deg, #1f4068 0%, #162447 50%, #101d42 100%)";
+        backgroundStyle = "linear-gradient(180deg, #1a2a6c 0%, #275d8c 100%)";
     }
-
-    // 웹사이트 전체 body 배경에 주입
     document.body.style.background = backgroundStyle;
 }
 
@@ -125,13 +112,15 @@ function renderPage() {
         currentMatch = dayDataList.find(d => d.time.getHours() === currentHour) || dayDataList[0];
     }
 
-    document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°C`;
+    // 아이폰 스타일 상단 박스 매핑
+    document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°`;
     document.getElementById('weather-desc').innerText = currentTab === 'today' ? "실시간 기온 정보" : "내일 예보 기온";
-    document.getElementById('rain-display').innerText = `💧 강수확률: ${currentMatch.pop}% ${currentMatch.rain > 0 ? `(예상 강수량: ${currentMatch.rain}mm)` : ''}`;
+    document.getElementById('rain-display').innerText = `💧 강수확률: ${currentMatch.pop}%`;
 
-    recommendOutfit(currentMatch.temp);
-    document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
+    // 전체 가이드 표 중 현재 온도에 색상 하이라이트 넣기
+    highlightOutfitTable(currentMatch.temp);
     
+    document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
     buildChart(dayDataList);
 }
 
@@ -142,17 +131,15 @@ function switchDay(day) {
     renderPage();
 }
 
-// 📊 수치만 투명하고 깨끗하게 강조하는 차트 함수로 개편
 function buildChart(dayData) {
     const canvas = document.getElementById('tempChart');
     const ctx = canvas.getContext('2d');
     const chartWrapper = document.getElementById('chartWrapper');
     
-    // 그래프 뒷배경 색상(chartBg)은 더 이상 필요 없으므로 제거 또는 투명화 처리
-    const bgLayer = document.getElementById('chartBg');
-    if (bgLayer) bgLayer.style.background = "transparent";
-
-    const labels = dayData.map(d => `${d.time.getHours()}시`);
+    const labels = dayData.map(d => {
+        const hr = d.time.getHours();
+        return hr === new Date().getHours() && currentTab === 'today' ? '지금' : `${hr}시`;
+    });
     const temps = dayData.map(d => Math.round(d.temp));
 
     if (myChart) myChart.destroy();
@@ -162,17 +149,16 @@ function buildChart(dayData) {
         data: {
             labels: labels,
             datasets: [{
-                label: '기온',
                 data: temps,
-                borderColor: '#1d4ed8', // 짙고 뚜렷한 메인 블루 라인
-                borderWidth: 4,
+                borderColor: '#ffffff', // 화이트 순정 라인
+                borderWidth: 3,
                 backgroundColor: 'transparent',
                 fill: false,
-                tension: 0.2,
-                pointRadius: 5,
+                tension: 0.3,
+                pointRadius: 4,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#1d4ed8',
-                pointBorderWidth: 3
+                pointBorderColor: 'transparent',
+                pointBorderWidth: 0
             }]
         },
         options: {
@@ -184,27 +170,23 @@ function buildChart(dayData) {
                     display: true,
                     align: 'top',
                     anchor: 'end',
-                    offset: 5,
+                    offset: 4,
                     font: { weight: 'bold', size: 13 },
-                    color: '#1e293b', 
-                    textStrokeColor: '#ffffff',
-                    textStrokeWidth: 3,
-                    formatter: (value) => `${value}°C` // ☔ 강수확률 표기 제거 완료!
+                    color: '#ffffff', 
+                    formatter: (value) => `${value}°`
                 }
             },
             scales: {
                 y: { 
                     display: false, 
-                    min: Math.min(...temps) - 3, 
-                    max: Math.max(...temps) + 3 
+                    min: Math.min(...temps) - 2, 
+                    max: Math.max(...temps) + 2 
                 },
                 x: {
                     grid: { display: false },
                     ticks: { 
-                        color: '#1e293b',
-                        font: { size: 12, weight: 'bold' },
-                        textStrokeColor: '#ffffff',
-                        textStrokeWidth: 2
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        font: { size: 12, weight: '500' }
                     }
                 }
             }
@@ -212,8 +194,9 @@ function buildChart(dayData) {
         plugins: [ChartDataLabels]
     });
 
+    // 현재 시간대가 앞선 스크롤 중앙에 오도록 처리
     setTimeout(() => {
-        chartWrapper.scrollLeft = 280; 
+        chartWrapper.scrollLeft = 0; 
     }, 150);
 }
 
@@ -223,13 +206,13 @@ function renderForecastTable(daily) {
 
     for (let i = 1; i < daily.time.length; i++) {
         const date = new Date(daily.time[i]);
-        const dayStr = `${date.getMonth() + 1}/${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
+        const dayStr = i === 1 ? '오늘' : `${['일','월','화','수','목','금','토'][date.getDay()]}요일`;
         const row = `
             <tr>
                 <td><strong>${dayStr}</strong></td>
-                <td>${getWeatherDesc(daily.weather_code[i])}</td>
-                <td style="color: #4a90e2">${Math.round(daily.temperature_2m_min[i])}°C</td>
-                <td style="color: #e24a4a">${Math.round(daily.temperature_2m_max[i])}°C</td>
+                <td>☀️ ${getWeatherDesc(daily.weather_code[i])}</td>
+                <td>${Math.round(daily.temperature_2m_min[i])}°</td>
+                <td><strong>${Math.round(daily.temperature_2m_max[i])}°</strong></td>
             </tr>
         `;
         tbody.innerHTML += row;
