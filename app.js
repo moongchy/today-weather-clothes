@@ -1,3 +1,5 @@
+Chart.register(ChartDataLabels);
+
 let globalWeatherData = null;
 let currentTab = 'today';
 let myChart = null;
@@ -150,7 +152,7 @@ function buildChart(dayData) {
             labels: labels,
             datasets: [{
                 data: temps,
-                borderColor: '#ffffff', // 화이트 순정 라인
+                borderColor: '#ffffff',
                 borderWidth: 3,
                 backgroundColor: 'transparent',
                 fill: false,
@@ -166,12 +168,13 @@ function buildChart(dayData) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
+                // ⚠️ datalabels 옵션을 명확하게 정의하여 렌더링 오류 방지
                 datalabels: {
                     display: true,
                     align: 'top',
                     anchor: 'end',
                     offset: 4,
-                    font: { weight: 'bold', size: 13 },
+                    font: { weight: 'bold', size: 12 },
                     color: '#ffffff', 
                     formatter: (value) => `${value}°`
                 }
@@ -190,11 +193,10 @@ function buildChart(dayData) {
                     }
                 }
             }
-        },
-        plugins: [ChartDataLabels]
+        }
+        // ⚠️ 맨 밑에 있던 plugins: [ChartDataLabels] 문장 제거 (상단에서 전역 등록했으므로 필요 없음)
     });
 
-    // 현재 시간대가 앞선 스크롤 중앙에 오도록 처리
     setTimeout(() => {
         chartWrapper.scrollLeft = 0; 
     }, 150);
