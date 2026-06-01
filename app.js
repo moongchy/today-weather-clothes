@@ -71,23 +71,83 @@ function initApp() {
     }
 }
 
-// 💡 [1번 답변] OpenWeather API를 사용하여 안정적이고 빠른 데이터 처리
+// app.js의 기존 getWeatherData 함수를 아래 코드로 완전히 교체해 주세요!
 async function getWeatherData(lat, lon) {
-    const apiKey = 'YOUR_OPENWEATHER_API_KEY'; // YOUR_OPENWEATHER_API_KEY 부분에 실제 키를 입력하세요.
+    // 💡 오픈메테오 API 주소 (1시간 단위 기온, 강수확률, 날씨코드 및 주간 최고/최저기온 요청)
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
     
-    // One Call API 3.0은 실시간, 시간대별, 주간별 데이터를 한 번에 가져와 매우 효율적임
-    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&exclude=minutely,alerts&units=metric&lang=kr&appid=${apiKey}`;
     try {
         const response = await fetch(url);
-        globalWeatherData = await response.json();
+        const data = await response.json();
         
+        // 오픈메테오 데이터를 기존 One Call 3.0 변수 구조와 완벽히 호환되도록 리포맷팅(가공)
+        const now = new Date();
+        const nowHr = now.getHours();
+        
+        // 1. WMO 날씨 코드를 'Main 문자열(Clear, Rain 등)'로 변환하는 내부 매퍼 함수
+        const parseWmoCode = (code) => {
+            if (code <= 1) return { main: "Clear", icon: "01" }; // 맑음
+            if (code <= 3) return { main: "Clouds", icon: "03" }; // 구름/흐림
+            if (code >= 51 && code <= 67) return { main: "Rain", icon: "10" }; // 비
+            if (code >= 71 && code <= 77) return { main: "Snow", icon: "13" }; // 눈
+            if (code >= 80 && code <= 82) return { main: "Rain", icon: "09" }; // 소나기
+            if (code >= 95) return { main: "Thunderstorm", icon: "11" }; // 뇌우
+            return { main: "Clouds", icon: "03" }; // 기본값 흐림
+        };
+
+        const currentWmo = parseWmoCode(data.hourly.weathercode[nowHr]);
+
+        globalWeatherData = {
+            current: {
+                temp: data.hourly.temperature_2m[nowHr],
+                sunrise: 6,   // 그라디언트 배경 전환용 기본값 세팅 (오전 6시)
+                sunset: 19,   // 그라디언트 배경 전환용 기본값 세팅 (오후 7시)
+                weather: [{ 
+                    main: currentWmo.main, 
+                    icon: currentWmo.icon + (nowHr >= 6 && nowHr < 18 ? "d" : "n") // 낮밤 아이콘 처리
+                }]
+            },
+            // 💡 1시간 단위 데이터를 그대로 살려 스크롤 연동 유지
+            hourly: data.hourly.time.map((timeStr, idx) => {
+                const itemDate = new Date(timeStr);
+                const itemHr = itemDate.getHours();
+                const wmo = parseWmoCode(data.hourly.weathercode[idx]);
+                return {
+                    dt: Math.floor(itemDate.getTime() / 1000),
+                    temp: data.hourly.temperature_2m[idx],
+                    pop: (data.hourly.precipitation_probability[idx] || 0) / 100, // 0~1 범위로 정규화
+                    weather: [{ 
+                        main: wmo.main, 
+                        icon: wmo.icon + (itemHr >= 6 && itemHr < 18 ? "d" : "n") 
+                    }]
+                };
+            }),
+            // 📅 하단 주간 가로 횡 예보용 배열 매핑
+            daily: data.daily.time.map((timeStr, idx) => {
+                const wmo = parseWmoCode(data.daily.weathercode[idx]);
+                return {
+                    dt: Math.floor(new Date(timeStr).getTime() / 1000),
+                    temp: {
+                        min: data.daily.temperature_2m_min[idx],
+                        max: data.daily.temperature_2m_max[idx]
+                    },
+                    pop: 0, // 오픈메테오 일별 기본 강수확률 예외 처리
+                    weather: [{ main: wmo.main, icon: wmo.icon + "d" }]
+                };
+            })
+        };
+        
+        // 행정구역 오픈 API 연동 전까지는 깔끔하게 내 위치 정보로 마킹
         document.getElementById('location').innerText = `📍 현재 내 위치`;
+        
+        // 기존에 만들어둔 렌더링 및 배경 전환 시스템 가동
         updateSiteBackground();
         renderPage();
-        renderForecastList(globalWeatherData.daily); // OpenWeather는 주간 예보 배열을 daily로 제공
+        renderForecastList(globalWeatherData.daily);
+        
     } catch (e) {
-        console.error(e);
-        document.getElementById('location').innerText = `❌ API 연결 실패`;
+        console.error("오픈메테오 API 통신 에러:", e);
+        document.getElementById('location').innerText = `❌ 날씨 데이터 로딩 실패`;
     }
 }
 
