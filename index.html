@@ -2,64 +2,112 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘 뭐 입지? - 라이브 날씨 옷차림</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>기온별 옷차림 날씨 앱</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>👕 오늘 뭐 입지?</h1>
-            <p id="location">위치 정보 가져오는 중...</p>
-            <div id="current-weather">
-                <span id="temp-display">--°C</span>
-                <span id="weather-desc">날씨 정보 로딩...</span>
-                <span id="rain-display"></span>
-            </div>
+        <header id="main-weather">
+            <div id="location">📍 위치 확인 중...</div>
+            <div id="temp-display">--°C</div>
+            <div id="weather-desc">맑음</div>
+            <div id="rain-display">강수 정보 로드 중...</div>
         </header>
 
         <div class="tab-container">
-            <button class="tab-btn active" onclick="switchDay('today')">오늘의 옷차림</button>
-            <button class="tab-btn" onclick="switchDay('tomorrow')">내일의 옷차림</button>
+            <button class="tab-btn active" onclick="switchDay('today')">오늘</button>
+            <button class="tab-btn" onclick="switchDay('tomorrow')">내일</button>
         </div>
-
-        <section class="outfit-section">
-            <table class="outfit-table">
-                <tbody>
-                    <tr>
-                        <th>외투</th>
-                        <td id="outfit-outer">-</td>
-                    </tr>
-                    <tr>
-                        <th>상의</th>
-                        <td id="outfit-top">-</td>
-                    </tr>
-                    <tr>
-                        <th>하의</th>
-                        <td id="outfit-bottom">-</td>
-                    </tr>
-                    <tr>
-                        <th>복합/기타</th>
-                        <td id="outfit-etc">-</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-<section class="graph-section">
-            <h2 id="graph-title">📈 시간대별 기온 변화 (오늘)</h2>
+        
+        <section class="hourly-section">
+            <h3 id="graph-title">📈 시간대별 기온 변화</h3>
             <div class="chart-scroll-container" id="chartWrapper">
                 <div class="chart-inner-canvas">
-                    <div class="chart-bg-layer" id="chartBg"></div>
                     <canvas id="tempChart"></canvas>
                 </div>
             </div>
         </section>
 
+        <section class="outfit-section">
+            <h2>👔 기온별 옷차림 가이드</h2>
+            <div class="table-responsive">
+                <table class="outfit-table">
+                    <thead>
+                        <tr>
+                            <th>기온</th>
+                            <th>외투</th>
+                            <th>상의</th>
+                            <th>하의</th>
+                            <th>기타</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outfit-rows">
+                        <tr data-min="28" data-max="999">
+                            <td class="temp-col">28°C 이상</td>
+                            <td>-</td>
+                            <td>민소매, 반팔 티셔츠</td>
+                            <td>반바지(핫팬츠), 짧은 치마</td>
+                            <td>민소매 원피스, 린넨 재질 옷</td>
+                        </tr>
+                        <tr data-min="23" data-max="27">
+                            <td class="temp-col">27~23°C</td>
+                            <td>-</td>
+                            <td>반팔 티셔츠, 얇은 셔츠, 얇은 긴팔 티셔츠</td>
+                            <td>반바지, 면바지</td>
+                            <td>-</td>
+                        </tr>
+                        <tr data-min="20" data-max="22">
+                            <td class="temp-col">22~20°C</td>
+                            <td>얇은 가디건</td>
+                            <td>긴팔 티셔츠, 셔츠, 블라우스, 후드티</td>
+                            <td>면바지, 슬랙스, 7부 바지, 청바지</td>
+                            <td>-</td>
+                        </tr>
+                        <tr data-min="17" data-max="19">
+                            <td class="temp-col">19~17°C</td>
+                            <td>얇은 니트, 얇은 가디건, 얇은 재킷, 바람막이</td>
+                            <td>후드티, 스웨트셔츠(맨투맨)</td>
+                            <td>긴바지, 청바지, 슬랙스, 스키니진</td>
+                            <td>-</td>
+                        </tr>
+                        <tr data-min="12" data-max="16">
+                            <td class="temp-col">16~12°C</td>
+                            <td>재킷, 가디건, 야상</td>
+                            <td>스웨트셔츠(맨투맨), 셔츠, 기모 후드티</td>
+                            <td>청바지, 면바지</td>
+                            <td>스타킹, 니트</td>
+                        </tr>
+                        <tr data-min="9" data-max="11">
+                            <td class="temp-col">11~9°C</td>
+                            <td>재킷, 야상, 점퍼, 트렌치 코트</td>
+                            <td>-</td>
+                            <td>청바지, 면바지, 검은색 스타킹, 기모 바지, 레이어드</td>
+                            <td>니트</td>
+                        </tr>
+                        <tr data-min="5" data-max="8">
+                            <td class="temp-col">8~5°C</td>
+                            <td>(울)코트, 가죽 재킷</td>
+                            <td>-</td>
+                            <td>레깅스, 청바지, 두꺼운 바지, 기모</td>
+                            <td>스카프, 플리스, 내복, 니트</td>
+                        </tr>
+                        <tr data-min="-999" data-max="4">
+                            <td class="temp-col">4°C 이하</td>
+                            <td>패딩, 두꺼운 코트</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>누빔, 내복, 목도리, 장갑, 기모, 방한용품</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="forecast-section">
-            <h2>📅 주간 날씨 예보</h2>
+            <h2>📅 5일간의 일기예보</h2>
             <table class="forecast-table">
                 <thead>
                     <tr>
@@ -69,11 +117,10 @@
                         <th>최고</th>
                     </tr>
                 </thead>
-                <tbody id="forecast-body"></tbody>
+                <tbody id="forecast-body">
+                    </tbody>
             </table>
         </section>
     </div>
-
-    <script src="app.js"></script>
 </body>
 </html>
