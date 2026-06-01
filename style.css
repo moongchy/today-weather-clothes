@@ -20,8 +20,8 @@ body {
     max-width: 480px;
 }
 
-/* 1. 아이폰 스타일 대형 헤더 */
-header id="main-weather" {
+/* 수정 코드 */
+#main-weather {
     text-align: center;
     padding: 40px 10px 25px 10px;
     background: transparent;
