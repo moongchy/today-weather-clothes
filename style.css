@@ -2,13 +2,13 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: #ffffff;
     margin: 0;
-    padding: 10px;
+    padding: 12px;
     display: flex;
     justify-content: center;
     min-height: 100vh;
     box-sizing: border-box;
     background: #4a90e2; 
-    transition: background 1s ease;
+    transition: background 1.2s ease-in-out; /* 배경 부드럽게 시프트 */
 }
 
 *, *::before, *::after {
@@ -20,182 +20,123 @@ body {
     max-width: 480px;
 }
 
-/* 수정 코드 */
+/* 1. 메인 헤더 */
 #main-weather {
     text-align: center;
-    padding: 40px 10px 25px 10px;
-    background: transparent;
+    padding: 30px 10px 15px 10px;
 }
 
-#location {
-    font-size: 1.3rem;
-    font-weight: 500;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+#location { font-size: 1.5rem; font-weight: 500; }
+#temp-display { font-size: 5.5rem; font-weight: 200; margin: 2px 0; }
+#weather-desc { font-size: 1.2rem; font-weight: 400; opacity: 0.9; }
+#range-display { font-size: 1rem; opacity: 0.8; margin-top: 4px; }
+
+#weather-summary {
+    font-size: 0.92rem;
+    padding: 0 12px;
+    margin-bottom: 15px;
+    text-align: center;
+    line-height: 1.4;
+    opacity: 0.95;
 }
 
-#temp-display {
-    font-size: 5rem;
-    font-weight: 200;
-    margin: 5px 0;
-    text-shadow: 0 1px 5px rgba(0,0,0,0.1);
-    padding-left: 20px; /* 도(°) 표시 밸런스 조정 */
-}
-
-#weather-desc {
-    font-size: 1.2rem;
-    font-weight: 400;
-    opacity: 0.9;
-}
-
-#rain-display {
-    display: block;
-    font-size: 0.95rem;
-    margin-top: 8px;
-    font-weight: bold;
-    background: rgba(0, 0, 0, 0.15);
-    padding: 4px 12px;
-    border-radius: 20px;
-    display: inline-block;
-}
-
-/* 탭 스타일 */
-.tab-container {
-    display: flex;
-    gap: 8px;
-    margin: 10px 0;
-}
-
+/* 탭 링크 */
+.tab-container { display: flex; gap: 8px; margin-bottom: 10px; }
 .tab-btn {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    background: rgba(255, 255, 255, 0.2);
-    font-size: 0.95rem;
-    font-weight: bold;
-    color: #ffffff;
-    border-radius: 10px;
-    cursor: pointer;
-    backdrop-filter: blur(5px);
+    flex: 1; padding: 10px; border: none; background: rgba(255, 255, 255, 0.15);
+    font-size: 0.9rem; font-weight: bold; color: #ffffff; border-radius: 10px; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
+.tab-btn.active { background: rgba(255, 255, 255, 0.35); }
 
-.tab-btn.active {
-    background: rgba(255, 255, 255, 0.4);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* 블러 카드시스템 카드 공통 */
+/* 모듈 카드 공통 */
 section {
     background: rgba(255, 255, 255, 0.15);
     border-radius: 16px;
     padding: 16px;
     margin-bottom: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.08);
 }
 
-h2 { 
-    font-size: 1rem; 
-    margin: 0 0 12px 0; 
-    opacity: 0.9;
-    font-weight: 600;
-}
+h2 { font-size: 0.88rem; margin: 0 0 12px 0; opacity: 0.8; font-weight: 600; text-transform: uppercase; }
 
-h3 {
-    font-size: 0.9rem;
-    margin: 0 0 10px 0;
-    opacity: 0.8;
-}
-
-/* 가로 시간대 차트 스크롤 시스템 */
-.chart-scroll-container {
-    width: 100%;
+/* 2. 시간대별 예보 가로 스크롤 아이템 */
+.hourly-scroll-container {
+    display: flex;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    gap: 18px;
+    padding-bottom: 4px;
 }
+.hourly-scroll-container::-webkit-scrollbar { display: none; }
 
-.chart-scroll-container::-webkit-scrollbar {
-    display: none; /* 스크롤바 숨김으로 미니멀 유지 */
+.hourly-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 48px;
+    text-align: center;
 }
+.hourly-time { font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; }
+.hourly-icon { font-size: 1.4rem; margin-bottom: 2px; }
+.hourly-pop { font-size: 0.72rem; color: #82c0ff; font-weight: 700; height: 14px; margin-bottom: 6px; }
+.hourly-temp { font-size: 1rem; font-weight: 600; }
 
-.chart-inner-canvas {
-    width: 780px; 
-    height: 160px;
-}
+/* 3. 기온별 옷차림 표 모바일 스크롤 */
+.table-responsive { width: 100%; overflow-x: auto; border-radius: 10px; }
+.outfit-table { width: 100%; min-width: 450px; border-collapse: collapse; font-size: 0.82rem; }
+.outfit-table th { background: rgba(0, 0, 0, 0.08); padding: 8px; font-weight: 600; }
+.outfit-table td { padding: 10px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); opacity: 0.85; }
+.temp-col { font-weight: bold; opacity: 1 !important; }
 
-/* 2. 옷차림 표 모바일 콤팩트 디자인 */
-.table-responsive {
-    width: 100%;
-    overflow-x: auto;
-    border-radius: 10px;
-}
-
-.outfit-table {
-    width: 100%;
-    min-width: 440px; /* 모바일 가로 찌그러짐 방지선 */
-    border-collapse: collapse;
-    font-size: 0.83rem;
-    text-align: left;
-}
-
-.outfit-table th {
-    background: rgba(0, 0, 0, 0.1);
-    padding: 8px 10px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.9);
-}
-
-.outfit-table td {
-    padding: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.85);
-    vertical-align: middle;
-}
-
-.temp-col {
-    font-weight: bold;
-    color: #ffffff !important;
-}
-
-/* 🌟 대망의 현재 기온 하이라이트 행 효과 */
+/* 현재 온도 행 하이라이트 */
 .outfit-table tr.highlight {
-    background: rgba(255, 255, 255, 0.95) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    background: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     transform: scale(1.01);
-    position: relative;
-    z-index: 5;
 }
+.outfit-table tr.highlight td { color: #1e293b !important; font-weight: 600; opacity: 1; }
+.outfit-table tr.highlight .temp-col { color: #0284c7 !important; }
 
-.outfit-table tr.highlight td {
-    color: #1e293b !important; /* 텍스트를 어둡게 하여 시인성 극대화 */
-    border-bottom: none;
-    font-weight: 600;
-}
-
-.outfit-table tr.highlight .temp-col {
-    color: #1d4ed8 !important; /* 현재 온도 스팬 강조색 */
-}
-
-/* 3. 주간 예보 리스트 */
-.forecast-table {
-    width: 100%;
-    border-collapse: collapse;
+/* 4. 아이폰 순정 스타일 주간 레이아웃 */
+.forecast-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.95rem;
 }
+.forecast-row:last-child { border-bottom: none; }
 
-.forecast-table th { display: none; } /* 깔끔함을 위해 헤더 제거 */
+.fc-day { width: 65px; font-weight: 500; }
+.fc-icon-box { width: 60px; display: flex; flex-direction: column; align-items: center; }
+.fc-icon { font-size: 1.25rem; }
+.fc-pop { font-size: 0.7rem; color: #82c0ff; font-weight: bold; height: 12px; }
 
-.forecast-table td {
-    padding: 14px 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+/* 기온 범위 게이지 바 컴포넌트 */
+.fc-temp-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    justify-content: flex-end;
 }
+.fc-min-temp { opacity: 0.6; font-size: 0.9rem; width: 30px; text-align: right; }
+.fc-max-temp { font-weight: 500; font-size: 0.9rem; width: 30px; text-align: right; }
 
-.forecast-table tr:last-child td {
-    border-bottom: none;
+.fc-bar-bg {
+    position: relative;
+    width: 80px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
 }
-
-.forecast-table td:nth-child(1) { text-align: left; font-weight: 500; width: 30%; }
-.forecast-table td:nth-child(2) { text-align: center; width: 40%; font-size: 0.9rem; }
-.forecast-table td:nth-child(3) { text-align: right; color: rgba(255,255,255,0.6); width: 15%; }
-.forecast-table td:nth-child(4) { text-align: right; font-weight: 500; width: 15%; }
+.fc-bar-fill {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, #ffb900, #ff5e62);
+    border-radius: 2px;
+}
