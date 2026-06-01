@@ -266,32 +266,122 @@ h2 { font-size: 0.9rem; margin: 0 0 14px 0; opacity: 0.8; font-weight: 600; text
     border-radius: 3px;
 }
 
-/* style.css 맨 하단 미디어 쿼리 부분을 아래 코드로 교체해 주세요 */
-@media (min-width: 768px) {
-    .container {
-        display: grid;
-        /* 💡 50%씩 균등하게 나누되, 컨텐츠가 잘리지 않도록 최소 폭(minmax)을 안전하게 지정 */
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); 
-        column-gap: 24px;
-        row-gap: 16px;
-        padding: 20px;
-    }
-    #main-weather, #weather-summary, .tab-container, .hourly-section {
-        grid-column: span 2;
-    }
-    .outfit-section {
-        grid-column: 1;
-        margin-bottom: 0;
-    }
-    .forecast-section {
-        grid-column: 2;
-        margin-bottom: 0;
-    }
+/* 여기서부터 style.css 맨 아래까지 기존 코드를 지우고 이 코드로 교체해 주세요 */
+
+/* 👔 [2번 답변] 모든 매체 공통: 기온별 옷차림 박스 창 좁히고 상하 스크롤 부여 */
+.table-responsive { 
+    width: 100%; 
+    border-radius: 12px; 
+    overflow-y: auto;       /* 상하 스크롤 활성화 */
+    max-height: 280px;      /* 창 높이를 제한하여 불필요한 계절 기온 차단 */
+    scroll-behavior: smooth;
 }
 
-/* style.css 맨 아래에 추가 */
+/* 옷차림 박스 상하 스크롤바 세련되게 다듬기 */
+.table-responsive::-webkit-scrollbar { width: 5px; }
+.table-responsive::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+.table-responsive::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
 
-/* 모달 전체 배경 오버레이 */
+
+/* 📅 5일간의 일기예보 기본 컨테이너 흐름 */
+#forecast-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 4. 아이폰 순정 스타일 주간 레이아웃 */
+.forecast-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.95rem;
+}
+.forecast-row:last-child { border-bottom: none; }
+
+.fc-day { width: 75px; font-weight: 500; }
+.fc-icon-box { width: 65px; display: flex; flex-direction: column; align-items: center; }
+.fc-icon { font-size: 1.3rem; }
+.fc-pop { font-size: 0.72rem; color: #b6daf7; font-weight: bold; height: 12px; }
+
+/* 기온 범위 게이지 바 컴포넌트 */
+.fc-temp-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    justify-content: flex-end;
+}
+.fc-min-temp { opacity: 0.6; font-size: 0.92rem; width: 35px; text-align: right; }
+.fc-max-temp { font-weight: 500; font-size: 0.92rem; width: 35px; text-align: right; }
+
+.fc-bar-bg {
+    position: relative;
+    width: 120px; 
+    height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.fc-bar-fill {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, #ffbc11, #ff5e62);
+    border-radius: 3px;
+}
+
+
+/* 💻 [1번 답변] 웹 및 아이패드(768px 이상) 대응: 2단 분할 해제 및 1단 세로 정렬 */
+@media (min-width: 768px) {
+    .container {
+        display: flex;
+        flex-direction: column; /* 2단 그리드를 풀고 위에서 아래로 흐르게 변경 */
+        gap: 16px;
+    }
+
+    /* 주간 예보 리스트를 하단에서 가로 횡으로 배치 */
+    #forecast-list {
+        flex-direction: row; 
+        gap: 12px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+    
+    #forecast-list::-webkit-scrollbar { height: 5px; }
+    #forecast-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+    /* 가로 배열에 맞게 주간 예보 칸 디자인 변경 */
+    .forecast-row {
+        flex: 1;
+        min-width: 130px;
+        flex-direction: column; /* 세로형 카드로 변환 */
+        justify-content: center;
+        gap: 8px;
+        padding: 16px 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        border-bottom: none;
+        text-align: center;
+    }
+    
+    .fc-day { width: auto; text-align: center; font-size: 0.9rem; }
+    .fc-icon-box { width: auto; }
+    
+    .fc-temp-container {
+        width: 100%;
+        justify-content: center;
+        gap: 6px;
+    }
+    .fc-min-temp { width: auto; text-align: center; }
+    .fc-max-temp { width: auto; text-align: center; }
+    
+    /* 가로 카드 형태에서는 게이지 바 생략 */
+    .fc-bar-bg { display: none; } 
+}
+
+
+/* 🚨 위치 권한 모달 스타일 */
 .location-modal {
     position: fixed;
     top: 0;
@@ -308,7 +398,6 @@ h2 { font-size: 0.9rem; margin: 0 0 14px 0; opacity: 0.8; font-weight: 600; text
     -webkit-backdrop-filter: blur(5px);
 }
 
-/* 모달 본체 */
 .modal-content {
     background: #ffffff;
     color: #1e293b;
@@ -321,68 +410,21 @@ h2 { font-size: 0.9rem; margin: 0 0 14px 0; opacity: 0.8; font-weight: 600; text
     animation: modalFadeIn 0.3s ease-out;
 }
 
-.modal-content h3 {
-    margin-top: 0;
-    font-size: 1.2rem;
-    color: #0f172a;
-}
+.modal-content h3 { margin-top: 0; font-size: 1.2rem; color: #0f172a; }
+.modal-content p { font-size: 0.9rem; line-height: 1.4; color: #64748b; margin-bottom: 16px; }
 
-.modal-content p {
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: #64748b;
-    margin-bottom: 16px;
-}
+.instructions { background: #f1f5f9; padding: 14px 14px 14px 24px; border-radius: 12px; text-align: left; margin-bottom: 20px; }
+.instructions p { margin: 0 0 8px -10px; color: #334155; font-weight: bold; }
+.instructions ol { margin: 0; padding: 0 0 0 12px; font-size: 0.88rem; color: #475569; }
+.instructions li { margin-bottom: 6px; }
+.instructions li strong { color: #0284c7; }
 
-/* 안내 순서 박스 */
-.instructions {
-    background: #f1f5f9;
-    padding: 14px 14px 14px 24px;
-    border-radius: 12px;
-    text-align: left;
-    margin-bottom: 20px;
-}
-
-.instructions p {
-    margin: 0 0 8px -10px;
-    color: #334155;
-    font-weight: bold;
-}
-
-.instructions ol {
-    margin: 0;
-    padding: 0 0 0 12px;
-    font-size: 0.88rem;
-    color: #475569;
-}
-
-.instructions li {
-    margin-bottom: 6px;
-}
-
-.instructions li strong {
-    color: #0284c7;
-}
-
-/* 닫기 버튼 */
 .modal-close-btn {
-    width: 100%;
-    padding: 12px;
-    background: #0284c7;
-    color: #ffffff;
-    border: none;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s;
+    width: 100%; padding: 12px; background: #0284c7; color: #ffffff; border: none;
+    border-radius: 12px; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: background 0.2s;
 }
+.modal-close-btn:hover { background: #0369a1; }
 
-.modal-close-btn:hover {
-    background: #0369a1;
-}
-
-/* 애니메이션 */
 @keyframes modalFadeIn {
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
