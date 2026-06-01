@@ -23,24 +23,34 @@ const weatherInfoMap = {
     95: { desc: "뇌우", icon: "⛈️", isRainy: true }
 };
 
+// 💡 [3번 답변] 옷차림 가이드 매핑 하이라이트 스크롤 유도
 function highlightOutfitTable(temp) {
     const roundedTemp = Math.round(temp);
+    let targetRow = null;
+
     document.querySelectorAll('#outfit-rows tr').forEach(row => {
         const min = parseInt(row.getAttribute('data-min'));
         const max = parseInt(row.getAttribute('data-max'));
         if (roundedTemp >= min && roundedTemp <= max) {
             row.classList.add('highlight');
+            targetRow = row;
         } else {
             row.classList.remove('highlight');
         }
     });
+
+    if (targetRow) {
+        setTimeout(() => {
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+    }
 }
 
 function initApp() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => getWeatherData(pos.coords.latitude, pos.coords.longitude),
-            () => getWeatherData(37.5665, 126.9780) // 거부 시 서울
+            () => getWeatherData(37.5665, 126.9780)
         );
     } else {
         getWeatherData(37.5665, 126.9780);
@@ -63,13 +73,11 @@ async function getWeatherData(lat, lon) {
     }
 }
 
-// 🌤️ [3번 답변] 날씨 조건 + 시간대를 조합한 동적 그라디언트 시스템
 function updateSiteBackground() {
     if (!globalWeatherData) return;
     const now = new Date();
     const hr = now.getHours();
     
-    // 오늘 낮 최고 기온 조건 기준 날씨 코드 추출
     const todayWeatherCode = globalWeatherData.daily.weather_code[1];
     const isRainyOrBad = weatherInfoMap[todayWeatherCode]?.isRainy || todayWeatherCode >= 3; 
 
@@ -78,25 +86,19 @@ function updateSiteBackground() {
 
     let bg = "";
     if (isRainyOrBad) {
-        // 비가 오거나 흐릴 때 (어둡고 무거운 그레이 블루)
         bg = "linear-gradient(180deg, #606c88 0%, #3f4c6b 100%)";
     } else if (hr >= sunriseHr && hr < sunriseHr + 2) {
-        // 아침 일출 (살구빛 핑크 그라디언트)
         bg = "linear-gradient(180deg, #ffafbd 0%, #ffc3a0 100%)";
     } else if (hr >= sunriseHr + 2 && hr < sunsetHr - 1) {
-        // 한낮 (아이폰 순정 쨍한 스카이 블루)
         bg = "linear-gradient(180deg, #3a88e9 0%, #5ea4ff 100%)";
     } else if (hr >= sunsetHr - 1 && hr <= sunsetHr + 1) {
-        // 일몰 노을 (자줏빛 오렌지)
         bg = "linear-gradient(180deg, #e65c00 0%, #f9d423 100%)";
     } else {
-        // 밤 (깊고 푸른 미드나잇 블루)
         bg = "linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%)";
     }
     document.body.style.background = bg;
 }
 
-// 📱 [1번 답변] 기온 가로 텍스트/아이콘 정렬 및 강수확률 예외 처리 필터
 function renderPage() {
     if (!globalWeatherData) return;
 
@@ -123,7 +125,6 @@ function renderPage() {
         currentMatch = dayDataList.find(d => d.time.getHours() === now.getHours()) || dayDataList[0];
     }
 
-    // 메인 정보 스왑
     const codeObj = weatherInfoMap[currentMatch.code] || { desc: "맑음", icon: "☀️" };
     document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°`;
     document.getElementById('weather-desc').innerText = codeObj.desc;
@@ -135,21 +136,22 @@ function renderPage() {
 
     highlightOutfitTable(currentMatch.temp);
 
-    // 가로 스크롤 리스트 생성
     const wrapper = document.getElementById('hourlyWrapper');
     wrapper.innerHTML = '';
 
-    dayDataList.forEach(d => {
+    dayDataList.forEach((d, index) => {
         const hr = d.time.getHours();
         const isCurrentHour = (currentTab === 'today' && hr === now.getHours());
         const timeLabel = isCurrentHour ? '지금' : `${hr}시`;
         const mapItem = weatherInfoMap[d.code] || { icon: "☀️" };
-        
-        // 💧 강수확률이 30% 이상일 때만 파란 글씨로 노출
         const popLabel = d.pop >= 30 ? `${d.pop}%` : '';
 
+        // 💡 [1, 3번 답변] 인스턴스 카드 생성 시 고유 클래스 및 클릭 리스너 설정 바인딩
+        const activeClass = isCurrentHour ? 'selected' : '';
+        const currentCheckId = isCurrentHour ? 'id="current-hour-focus"' : '';
+
         const itemHtml = `
-            <div class="hourly-item">
+            <div ${currentCheckId} class="hourly-item ${activeClass}" onclick="selectHourlyTime(this, ${d.temp})">
                 <div class="hourly-time">${timeLabel}</div>
                 <div class="hourly-icon">${mapItem.icon}</div>
                 <div class="hourly-pop">${popLabel}</div>
@@ -158,6 +160,23 @@ function renderPage() {
         `;
         wrapper.innerHTML += itemHtml;
     });
+
+    // 💡 [1번 답변] 렌더링 완료 직후 '지금(현재 시간)' 카드가 스크롤창 맨 첫머리에 수평 배치되도록 제어
+    setTimeout(() => {
+        const focusTarget = document.getElementById('current-hour-focus');
+        if (focusTarget && currentTab === 'today') {
+            wrapper.scrollLeft = focusTarget.offsetLeft - wrapper.offsetLeft;
+        } else {
+            wrapper.scrollLeft = 0;
+        }
+    }, 100);
+}
+
+// 💡 [3번 답변] 시간 항목 임의 터치 시 스타일 토글 및 옷차림 새로 매핑 연동 함수
+function selectHourlyTime(element, temp) {
+    document.querySelectorAll('.hourly-item').forEach(item => item.classList.remove('selected'));
+    element.classList.add('selected');
+    highlightOutfitTable(temp);
 }
 
 function switchDay(day) {
@@ -167,7 +186,6 @@ function switchDay(day) {
     renderPage();
 }
 
-// 📅 [2번 답변] 아이폰 순정 스타일 주간 막대 게이지 그래프 연산
 function renderForecastList(daily) {
     const listContainer = document.getElementById('forecast-list');
     listContainer.innerHTML = '';
@@ -189,7 +207,6 @@ function renderForecastList(daily) {
         const minT = Math.round(daily.temperature_2m_min[i]);
         const maxT = Math.round(daily.temperature_2m_max[i]);
 
-        // 상대적 가로 바 채우기 계산 백분율 구하기
         const leftPercent = ((minT - absoluteMin) / totalRange) * 100;
         const widthPercent = ((maxT - minT) / totalRange) * 100;
 
