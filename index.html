@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>기온별 옷차림 날씨 앱</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <header id="main-weather">
             <div id="location">📍 위치 확인 중...</div>
-            <div id="temp-display">--°C</div>
+            <div id="temp-display">--°</div>
             <div id="weather-desc">맑음</div>
-            <div id="rain-display">강수 정보 로드 중...</div>
+            <div id="range-display">최고:--° 최저:--°</div>
         </header>
+
+        <div id="weather-summary">날씨 정보를 분석 중입니다...</div>
 
         <div class="tab-container">
             <button class="tab-btn active" onclick="switchDay('today')">오늘</button>
@@ -22,12 +23,8 @@
         </div>
         
         <section class="hourly-section">
-            <h3 id="graph-title">📈 시간대별 기온 변화</h3>
-            <div class="chart-scroll-container" id="chartWrapper">
-                <div class="chart-inner-canvas">
-                    <canvas id="tempChart"></canvas>
+            <div class="hourly-scroll-container" id="hourlyWrapper">
                 </div>
-            </div>
         </section>
 
         <section class="outfit-section">
@@ -106,12 +103,11 @@
         </section>
 
         <section class="forecast-section">
-            <h2>📅 5일간의 일기예보</h2>
-            <table class="forecast-table">
-                <tbody id="forecast-body">
-                    </tbody>
-            </table>
- </section>
-    </div> <script src="app.js"></script>
+            <h2 class="section-title">📅 5일간의 일기예보</h2>
+            <div id="forecast-list">
+                </div>
+        </section>
+    </div>
+    <script src="app.js"></script>
 </body>
 </html>
