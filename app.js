@@ -1,32 +1,23 @@
 let globalWeatherData = null;
 let currentTab = 'today';
 
-const weatherInfoMap = {
-    0: { desc: "맑음", icon: "☀️", isRainy: false },
-    1: { desc: "대체로 맑음", icon: "🌤️", isRainy: false },
-    2: { desc: "구름 조금", icon: "⛅", isRainy: false },
-    3: { desc: "흐림", icon: "☁️", isRainy: false },
-    45: { desc: "안개", icon: "🌫️", isRainy: false },
-    48: { desc: "침적 안개", icon: "🌫️", isRainy: false },
-    51: { desc: "가벼운 이슬비", icon: "🌦️", isRainy: true },
-    53: { desc: "이슬비", icon: "🌧️", isRainy: true },
-    55: { desc: "짙은 이슬비", icon: "🌧️", isRainy: true },
-    61: { desc: "약한 비", icon: "🌧️", isRainy: true },
-    63: { desc: "보통 비", icon: "🌧️", isRainy: true },
-    65: { desc: "강한 비", icon: "☔", isRainy: true },
-    71: { desc: "약한 눈", icon: "🌨️", isRainy: true },
-    73: { desc: "보통 눈", icon: "❄️", isRainy: true },
-    75: { desc: "펑펑 눈", icon: "☃️", isRainy: true },
-    80: { desc: "약한 소나기", icon: "🌦️", isRainy: true },
-    81: { desc: "보통 소나기", icon: "🌧️", isRainy: true },
-    82: { desc: "강한 소나기", icon: "☔", isRainy: true },
-    95: { desc: "뇌우", icon: "⛈️", isRainy: true }
+// 💡 [최적화] 기온 및 시간 조건에 맞는 아이콘/낮밤 감성 배경 매핑 테이블
+const weatherVisualMap = {
+    "sunny-day": { desc: "맑음", icon: "☀️", isRainy: false },
+    "clear-night": { desc: "맑음", icon: "🌙", isRainy: false },
+    "clouds-day": { desc: "흐림", icon: "⛅", isRainy: false },
+    "clouds-night": { desc: "흐림", icon: "☁️", isRainy: false },
+    "rain": { desc: "비", icon: "🌧️", isRainy: true },
+    "snow": { desc: "눈", icon: "❄️", isRainy: true },
+    "thunder": { desc: "뇌우", icon: "⛈️", isRainy: true }
 };
 
+// 💡 [핵심] 사용자가 옷차림 항목을 터치했을 때 해당 기온 가이드를 최상단으로 밀어 올리는 정밀 스크롤 함수
 function highlightOutfitTable(temp) {
     const roundedTemp = Math.round(temp);
     let targetRow = null;
 
+    // 1. 매체별 구조(테이블 행 or 모바일 블록 카드)에 맞춰 하이라이트 클래스 토글
     document.querySelectorAll('#outfit-rows tr').forEach(row => {
         const min = parseInt(row.getAttribute('data-min'));
         const max = parseInt(row.getAttribute('data-max'));
@@ -39,11 +30,12 @@ function highlightOutfitTable(temp) {
         }
     });
 
-    // 💡 스크롤 대상을 .table-responsive 박스로 정밀 타겟팅하여 맨 위 정렬
+    // 2. [2번 피드백] 하이라이트된 카드를 무조건 스크롤 창의 '가장 위'로 밀착 정렬
     if (targetRow) {
         setTimeout(() => {
             const container = document.querySelector('.table-responsive');
             if (container) {
+                // 부모 섹션의 상단 기준점과 타이틀 높이 등을 감안하여 타겟 요소의 절대 위치 계산
                 const targetOffsetTop = targetRow.offsetTop;
                 
                 container.scrollTo({
@@ -55,7 +47,11 @@ function highlightOutfitTable(temp) {
     }
 }
 
-// 1. app.js 내의 기존 initApp() 함수를 찾아서 이 코드로 교체해 주세요!
+// 💡 [추가] 사파리 위치 안내 모달 닫기
+function closeLocationModal() {
+    document.getElementById('ios-location-modal').style.display = 'none';
+}
+
 function initApp() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -63,14 +59,10 @@ function initApp() {
                 getWeatherData(position.coords.latitude, position.coords.longitude);
             }, 
             error => {
-                // 사용자가 위치 권한을 거부했거나 가져오지 못했을 때
                 console.log("위치 권한 거부됨:", error);
+                getWeatherData(37.5665, 126.9780); // 서울 기준 기본값
                 
-                // 기본값으로 서울 날씨를 먼저 보여주고
-                getWeatherData(37.5665, 126.9780); 
-                
-                // 💡 아이폰/사파리 유저를 위한 안내 팝업창을 띄웁니다.
-                // 일반 PC나 안드로이드에서도 직관적인 가이드를 위해 통합 제공되도록 설계했습니다.
+                // 💡 [아이폰 피드백] 사파리 유저를 위한 안내 팝업 노출
                 document.getElementById('ios-location-modal').style.display = 'flex';
             }
         );
@@ -79,13 +71,12 @@ function initApp() {
     }
 }
 
-// 2. app.js 아무 데나 이 함수를 새로 추가해 주세요! (확인 후 닫기 버튼 기능)
-function closeLocationModal() {
-    document.getElementById('ios-location-modal').style.display = 'none';
-}
-
+// 💡 [1번 답변] OpenWeather API를 사용하여 안정적이고 빠른 데이터 처리
 async function getWeatherData(lat, lon) {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,weather_code&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&timezone=auto&past_days=1`;
+    const apiKey = 'YOUR_OPENWEATHER_API_KEY'; // YOUR_OPENWEATHER_API_KEY 부분에 실제 키를 입력하세요.
+    
+    // One Call API 3.0은 실시간, 시간대별, 주간별 데이터를 한 번에 가져와 매우 효율적임
+    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&exclude=minutely,alerts&units=metric&lang=kr&appid=${apiKey}`;
     try {
         const response = await fetch(url);
         globalWeatherData = await response.json();
@@ -93,23 +84,24 @@ async function getWeatherData(lat, lon) {
         document.getElementById('location').innerText = `📍 현재 내 위치`;
         updateSiteBackground();
         renderPage();
-        renderForecastList(globalWeatherData.daily);
+        renderForecastList(globalWeatherData.daily); // OpenWeather는 주간 예보 배열을 daily로 제공
     } catch (e) {
         console.error(e);
-        document.getElementById('location').innerText = `❌ 연결 실패`;
+        document.getElementById('location').innerText = `❌ API 연결 실패`;
     }
 }
 
+// 🌤️ 날씨 조건 + 시간대를 조합한 동적 그라디언트 시스템
 function updateSiteBackground() {
     if (!globalWeatherData) return;
     const now = new Date();
     const hr = now.getHours();
     
-    const todayWeatherCode = globalWeatherData.daily.weather_code[1];
-    const isRainyOrBad = weatherInfoMap[todayWeatherCode]?.isRainy || todayWeatherCode >= 3; 
+    const currentWeatherCode = globalWeatherData.current.weather[0].main;
+    const isRainyOrBad = currentWeatherCode === "Rain" || currentWeatherCode === "Drizzle" || currentWeatherCode === "Thunderstorm";
 
-    const sunriseHr = new Date(globalWeatherData.daily.sunrise[1]).getHours();
-    const sunsetHr = new Date(globalWeatherData.daily.sunset[1]).getHours();
+    const sunriseHr = new Date(globalWeatherData.current.sunrise * 1000).getHours(); // OpenWeather는 초 단위이므로 1000을 곱함
+    const sunsetHr = new Date(globalWeatherData.current.sunset * 1000).getHours();
 
     let bg = "";
     if (isRainyOrBad) {
@@ -126,59 +118,85 @@ function updateSiteBackground() {
     document.body.style.background = bg;
 }
 
+// 💡 [근본적 문제 해결] 데이터를 가져오자마자 '지금' 이전의 배열은 필터링하여 버림
 function renderPage() {
     if (!globalWeatherData) return;
 
     const hourly = globalWeatherData.hourly;
+    const now = new Date();
+    const nowHr = now.getHours();
+
     const targetDate = new Date();
     if (currentTab === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
     const targetStr = targetDate.toLocaleDateString('sv');
 
-    const dayDataList = [];
-    for (let i = 0; i < hourly.time.length; i++) {
-        if (hourly.time[i].substring(0, 10) === targetStr) {
-            dayDataList.push({
-                time: new Date(hourly.time[i]),
-                temp: hourly.temperature_2m[i],
-                pop: hourly.precipitation_probability[i],
-                code: hourly.weather_code[i]
-            });
+    // 데이터를 가져와 시간 반복문을 돌리기 직전에 필터링 로직 통과
+    const 앞으로의날씨 = hourly.filter(item => {
+        const itemDate = new Date(item.dt * 1000);
+        // 내일 탭이면 날짜가 일치하는 것만, 오늘 탭이면 날짜가 같고 현재 시간 이후인 것만 필터링
+        if (currentTab === 'tomorrow') {
+            return itemDate.toLocaleDateString('sv') === targetStr;
+        } else {
+            return itemDate.toLocaleDateString('sv') === targetStr && itemDate.getHours() >= nowHr;
         }
-    }
+    });
 
-    const now = new Date();
-    let currentMatch = dayDataList[0];
-    if (currentTab === 'today') {
-        currentMatch = dayDataList.find(d => d.time.getHours() === now.getHours()) || dayDataList[0];
-    }
+    if (앞으로의날씨.length === 0) return;
 
-    const codeObj = weatherInfoMap[currentMatch.code] || { desc: "맑음", icon: "☀️" };
+    const currentMatch = 앞으로의날씨[0]; // 필터링된 배열의 첫 번째가 언제나 '지금'이 됨
+
+    // 메인 정보 스왑
+    const codeMain = currentMatch.weather[0].main;
+    const isNight = currentMatch.weather[0].icon.includes('n');
+    const isClouds = codeMain === "Clouds";
+
+    // 날씨 아이콘 매핑 전략 갱신 (OpenWeather에 맞춤)
+    let iconLabel = isClouds ? "clouds-day" : "sunny-day";
+    if (isNight && isClouds) iconLabel = "clouds-night";
+    if (isNight && !isClouds) iconLabel = "clear-night";
+    if (codeMain === "Rain" || codeMain === "Drizzle") iconLabel = "rain";
+    if (codeMain === "Thunderstorm") iconLabel = "thunder";
+
+    const codeObj = weatherVisualMap[iconLabel] || { desc: "맑음", icon: "☀️" };
     document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°`;
     document.getElementById('weather-desc').innerText = codeObj.desc;
     
-    const maxT = Math.round(globalWeatherData.daily.temperature_2m_max[currentTab === 'today' ? 1 : 2]);
-    const minT = Math.round(globalWeatherData.daily.temperature_2m_min[currentTab === 'today' ? 1 : 2]);
+    // OpenWeather One Call daily[0]이 오늘 데이터를 제공
+    const dailyDataIdx = currentTab === 'today' ? 0 : 1;
+    const maxT = Math.round(globalWeatherData.daily[dailyDataIdx].temp.max);
+    const minT = Math.round(globalWeatherData.daily[dailyDataIdx].temp.min);
     document.getElementById('range-display').innerText = `최고:${maxT}° 최저:${minT}°`;
     document.getElementById('weather-summary').innerText = `현재 기온은 ${Math.round(currentMatch.temp)}°이며 오늘 최고 기온은 ${maxT}°까지 올라갈 예정입니다.`;
 
     highlightOutfitTable(currentMatch.temp);
 
+    // 가로 스크롤 리스트 생성
     const wrapper = document.getElementById('hourlyWrapper');
     wrapper.innerHTML = '';
 
-    dayDataList.forEach((d, index) => {
-        const hr = d.time.getHours();
-        const isCurrentHour = (currentTab === 'today' && hr === now.getHours());
+    앞으로의날씨.forEach(d => {
+        const itemDate = new Date(d.dt * 1000);
+        const hr = itemDate.getHours();
+        const isCurrentHour = (currentTab === 'today' && hr === nowHr);
         const timeLabel = isCurrentHour ? '지금' : `${hr}시`;
-        const mapItem = weatherInfoMap[d.code] || { icon: "☀️" };
-        const popLabel = d.pop >= 30 ? `${d.pop}%` : '';
+        
+        // 시간별 아이콘 매핑
+        const d_codeMain = d.weather[0].main;
+        const d_isClouds = d_codeMain === "Clouds";
+        let d_iconLabel = d_isClouds ? "clouds-day" : "sunny-day";
+        if (d_isClouds) d_iconLabel = d.weather[0].icon.includes('n') ? "clouds-night" : "clouds-day";
+        if (!d_isClouds) d_iconLabel = d.weather[0].icon.includes('n') ? "clear-night" : "sunny-day";
+        if (d_codeMain === "Rain" || d_codeMain === "Drizzle") d_iconLabel = "rain";
+        if (d_codeMain === "Thunderstorm") d_iconLabel = "thunder";
+        const mapItem = weatherVisualMap[d_iconLabel] || { icon: "☀️" };
 
-        // 💡 [1, 3번 답변] 인스턴스 카드 생성 시 고유 클래스 및 클릭 리스너 설정 바인딩
+        // 💧 강수확률이 30% 이상일 때만 파란 글씨로 노출
+        const popValue = Math.round(d.pop * 100);
+        const popLabel = popValue >= 30 ? `${popValue}%` : '';
         const activeClass = isCurrentHour ? 'selected' : '';
-        const currentCheckId = isCurrentHour ? 'id="current-hour-focus"' : '';
 
         const itemHtml = `
-            <div ${currentCheckId} class="hourly-item ${activeClass}" onclick="selectHourlyTime(this, ${d.temp})">
+            <div class="hourly-item ${activeClass}" onclick="selectHourlyTime(this, ${d.temp})">
                 <div class="hourly-time">${timeLabel}</div>
                 <div class="hourly-icon">${mapItem.icon}</div>
                 <div class="hourly-pop">${popLabel}</div>
@@ -187,65 +205,12 @@ function renderPage() {
         `;
         wrapper.innerHTML += itemHtml;
     });
-
-// [수정 전] renderPage() 함수 맨 아래에 있던 setTimeout 부분을 찾아서...
-    // [수정 후] 아래 코드로 완전히 교체해 주세요!
-    setTimeout(() => {
-        const wrapper = document.getElementById('hourlyWrapper');
-        const focusTarget = document.getElementById('current-hour-focus');
-        
-        if (focusTarget && currentTab === 'today') {
-            // 부모 컨테이너(wrapper)의 패딩과 스크롤 시작점을 계산하여 정확히 첫 번째에 배치
-            const offsetLeft = focusTarget.offsetLeft - wrapper.offsetLeft;
-            wrapper.scrollTo({
-                left: offsetLeft,
-                behavior: 'smooth'
-            });
-        } else {
-            wrapper.scrollLeft = 0;
-        }
-    }, 200); // 브라우저가 완전히 렌더링할 시간을 0.2초 확보
 }
 
-// [수정 전] function selectHourlyTime(element, temp) { ... }
-// [수정 후] 아래 코드로 함수 전체를 교체해 주세요!
 function selectHourlyTime(element, temp) {
-    // 1. 모든 시간 아이템에서 선택 효과 제거
-    document.querySelectorAll('.hourly-item').forEach(item => {
-        item.classList.remove('selected');
-    });
-    
-    // 2. 현재 클릭한 아이템에 선택 효과 적용
-    if (element) {
-        element.classList.add('selected');
-    }
-    
-    // 3. 기온에 맞춰 옷차림 가이드 행 하이라이트 및 스크롤 이동
-    const roundedTemp = Math.round(temp);
-    let targetRow = null;
-
-    document.querySelectorAll('#outfit-rows tr').forEach(row => {
-        const min = parseInt(row.getAttribute('data-min'));
-        const max = parseInt(row.getAttribute('data-max'));
-        
-        if (roundedTemp >= min && roundedTemp <= max) {
-            row.classList.add('highlight');
-            targetRow = row;
-        } else {
-            row.classList.remove('highlight');
-        }
-    });
-
-    // 4. 웹 브라우저 호환성을 고려한 옷차림 테이블 스크롤 이동
-    if (targetRow) {
-        setTimeout(() => {
-            targetRow.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'nearest', // 다른 화면 요소를 침범하지 않고 테이블 안에서만 부드럽게 이동
-                inline: 'start'
-            });
-        }, 50);
-    }
+    document.querySelectorAll('.hourly-item').forEach(item => item.classList.remove('selected'));
+    element.classList.add('selected');
+    highlightOutfitTable(temp);
 }
 
 function switchDay(day) {
@@ -255,26 +220,29 @@ function switchDay(day) {
     renderPage();
 }
 
+// 📅 [웹/아이패드 피드백] 데스크톱 모드에서는 가로형 카드로 분할 배치하도록 로직 수정
 function renderForecastList(daily) {
     const listContainer = document.getElementById('forecast-list');
     listContainer.innerHTML = '';
 
-    const allMaxs = daily.temperature_2m_max.slice(1, 6);
-    const allMins = daily.temperature_2m_min.slice(1, 6);
+    // daily[0]은 오늘, daily[1~5]까지 5일 예보 배열 생성
+    const forecastDays = daily.slice(1, 6);
+    const allMaxs = forecastDays.map(d => d.temp.max);
+    const allMins = forecastDays.map(d => d.temp.min);
     const absoluteMax = Math.max(...allMaxs);
     const absoluteMin = Math.min(...allMins);
     const totalRange = absoluteMax - absoluteMin;
 
-    for (let i = 1; i < 6; i++) {
-        const date = new Date(daily.time[i]);
-        const dayStr = i === 1 ? '오늘' : `${['일','월','화','수','목','금','토'][date.getDay()]}요일`;
-        const mapItem = weatherInfoMap[daily.weather_code[i]] || { icon: "☀️" };
+    forecastDays.forEach((d, i) => {
+        const date = new Date(d.dt * 1000);
+        // 첫 번째 카드는 '오늘'로 표기
+        const dayStr = i === 0 ? '오늘' : `${['일','월','화','수','목','금','토'][date.getDay()]}요일`;
         
-        const popMax = daily.precipitation_probability_max[i];
+        const popMax = Math.round(d.pop * 100);
         const popLabel = popMax >= 30 ? `${popMax}%` : '';
 
-        const minT = Math.round(daily.temperature_2m_min[i]);
-        const maxT = Math.round(daily.temperature_2m_max[i]);
+        const minT = Math.round(d.temp.min);
+        const maxT = Math.round(d.temp.max);
 
         const leftPercent = ((minT - absoluteMin) / totalRange) * 100;
         const widthPercent = ((maxT - minT) / totalRange) * 100;
@@ -283,7 +251,7 @@ function renderForecastList(daily) {
             <div class="forecast-row">
                 <div class="fc-day">${dayStr}</div>
                 <div class="fc-icon-box">
-                    <span class="fc-icon">${mapItem.icon}</span>
+                    <span class="fc-icon">${d.weather[0].icon.includes('d') ? "☀️" : "🌙"}</span>
                     <span class="fc-pop">${popLabel}</span>
                 </div>
                 <div class="fc-temp-container">
@@ -296,7 +264,7 @@ function renderForecastList(daily) {
             </div>
         `;
         listContainer.innerHTML += rowHtml;
-    }
+    });
 }
 
 initApp();
