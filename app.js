@@ -1,8 +1,27 @@
-Chart.register(ChartDataLabels);
-
 let globalWeatherData = null;
 let currentTab = 'today';
 let myChart = null;
+
+// 순정 Chart.js 내부에서 직접 숫자를 그리도록 설계한 커스텀 플러그인 (외부 라이브러리 필요 없음!)
+const customDatalabels = {
+    id: 'customDatalabels',
+    afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        ctx.save();
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        chart.metas.forEach((meta) => {
+            meta.data.forEach((point, index) => {
+                const value = data.datasets[0].data[index];
+                ctx.fillText(`${value}°`, point.x, point.y - 6);
+            });
+        });
+        ctx.restore();
+    }
+};
 
 function getWeatherDesc(code) {
     const codes = {
@@ -17,7 +36,6 @@ function getWeatherDesc(code) {
     return codes[code] || "흐림";
 }
 
-// 🌟 [핵심 변경] 실시간 온도를 받아서 전체 표 중 매칭되는 행을 찾아 하이라이트 처리
 function highlightOutfitTable(temp) {
     const roundedTemp = Math.round(temp);
     const rows = document.querySelectorAll('#outfit-rows tr');
@@ -28,7 +46,6 @@ function highlightOutfitTable(temp) {
         
         if (roundedTemp >= min && roundedTemp <= max) {
             row.classList.add('highlight');
-            // 모바일 유저를 위해 현재 매칭된 의상 정보 위치로 표를 자동 포커싱 이동
             setTimeout(() => {
                 row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
             }, 300);
@@ -43,8 +60,10 @@ function initApp() {
         navigator.geolocation.getCurrentPosition(position => {
             getWeatherData(position.coords.latitude, position.coords.longitude);
         }, () => {
-            getWeatherData(37.5665, 126.9780); // 위치 거부 시 서울 기본값
+            getWeatherData(37.5665, 126.9780); // GPS 거부 시 서울 기준
         });
+    } else {
+        getWeatherData(37.5665, 126.9780);
     }
 }
 
@@ -52,13 +71,18 @@ async function getWeatherData(lat, lon) {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&past_days=1`;
     try {
         const response = await fetch(url);
+        if (!response.ok) throw new Error('API 응답 실패');
         globalWeatherData = await response.json();
-        document.getElementById('location').innerText = `📍 고양시 인근 영역`;
+        
+        document.getElementById('location').innerText = `📍 현재 위치 기온`;
         
         updateSiteBackground();
         renderPage();
         renderForecastTable(globalWeatherData.daily);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("날씨 데이터 로드 오류:", e); 
+        document.getElementById('location').innerText = `❌ 날씨 로드 실패`;
+    }
 }
 
 function updateSiteBackground() {
@@ -75,7 +99,7 @@ function updateSiteBackground() {
     if (currentHour >= sunriseHour && currentHour < sunriseHour + 2) {
         backgroundStyle = "linear-gradient(180deg, #ffafbd 0%, #ffc3a0 100%)";
     } else if (currentHour >= sunriseHour + 2 && currentHour < sunsetHour - 1) {
-        backgroundStyle = "linear-gradient(180deg, #5097e6 0%, #2f73c4 100%)"; // 아이폰 순정 블루 느낌 최적화
+        backgroundStyle = "linear-gradient(180deg, #5097e6 0%, #2f73c4 100%)";
     } else if (currentHour >= sunsetHour - 1 && currentHour <= sunsetHour + 1) {
         backgroundStyle = "linear-gradient(180deg, #ed4264 0%, #ffedbc 100%)";
     } else {
@@ -114,12 +138,10 @@ function renderPage() {
         currentMatch = dayDataList.find(d => d.time.getHours() === currentHour) || dayDataList[0];
     }
 
-    // 아이폰 스타일 상단 박스 매핑
     document.getElementById('temp-display').innerText = `${Math.round(currentMatch.temp)}°`;
     document.getElementById('weather-desc').innerText = currentTab === 'today' ? "실시간 기온 정보" : "내일 예보 기온";
     document.getElementById('rain-display').innerText = `💧 강수확률: ${currentMatch.pop}%`;
 
-    // 전체 가이드 표 중 현재 온도에 색상 하이라이트 넣기
     highlightOutfitTable(currentMatch.temp);
     
     document.getElementById('graph-title').innerText = `📈 시간대별 기온 변화 (${currentTab === 'today' ? '오늘' : '내일'})`;
@@ -129,7 +151,7 @@ function renderPage() {
 function switchDay(day) {
     currentTab = day;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    if (event && event.target) event.target.classList.add('active');
     renderPage();
 }
 
@@ -146,56 +168,50 @@ function buildChart(dayData) {
 
     if (myChart) myChart.destroy();
 
-    myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: temps,
-                borderColor: '#ffffff',
-                borderWidth: 3,
-                backgroundColor: 'transparent',
-                fill: false,
-                tension: 0.3,
-                pointRadius: 4,
-                pointBackgroundColor: '#ffffff',
-                pointBorderColor: 'transparent',
-                pointBorderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                // ⚠️ datalabels 옵션을 명확하게 정의하여 렌더링 오류 방지
-                datalabels: {
-                    display: true,
-                    align: 'top',
-                    anchor: 'end',
-                    offset: 4,
-                    font: { weight: 'bold', size: 12 },
-                    color: '#ffffff', 
-                    formatter: (value) => `${value}°`
-                }
+    try {
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: temps,
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: 'transparent',
+                    pointBorderWidth: 0
+                }]
             },
-            scales: {
-                y: { 
-                    display: false, 
-                    min: Math.min(...temps) - 2, 
-                    max: Math.max(...temps) + 2 
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
                 },
-                x: {
-                    grid: { display: false },
-                    ticks: { 
-                        color: 'rgba(255, 255, 255, 0.85)',
-                        font: { size: 12, weight: '500' }
+                scales: {
+                    y: { 
+                        display: false, 
+                        min: Math.min(...temps) - 2, 
+                        max: Math.max(...temps) + 2 
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { 
+                            color: 'rgba(255, 255, 255, 0.85)',
+                            font: { size: 12, weight: '500' }
+                        }
                     }
                 }
-            }
-        }
-        // ⚠️ 맨 밑에 있던 plugins: [ChartDataLabels] 문장 제거 (상단에서 전역 등록했으므로 필요 없음)
-    });
+            },
+            plugins: [customDatalabels] // 자체 제작한 커스텀 안전 플러그인 주입
+        });
+    } catch(err) {
+        console.error("차트 빌드 실패:", err);
+    }
 
     setTimeout(() => {
         chartWrapper.scrollLeft = 0; 
@@ -221,4 +237,5 @@ function renderForecastTable(daily) {
     }
 }
 
+// 앱 실행
 initApp();
