@@ -57,30 +57,36 @@ function timeString(date) {
            String(d.getUTCMinutes()).padStart(2, "0");
 }
 
-function getBaseTime(now) {
-    const d = kstDate(now);
-    let hour = d.getUTCHours();
-    let minute = d.getUTCMinutes();
 
-    minute = Math.floor(minute / 10) * 10 - 10;
-    if (minute < 0) {
-        minute += 60;
+function getBaseTime(now = new Date()) {
+    // Vercel 서버 시간에 관계없이 한국 시간으로 계산
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+
+    let year = kst.getUTCFullYear();
+    let month = kst.getUTCMonth();
+    let day = kst.getUTCDate();
+    let hour = kst.getUTCHours();
+    const minute = kst.getUTCMinutes();
+
+    // 실황 자료는 매시 10분 이후부터 사용 가능
+    if (minute < 10) {
         hour -= 1;
     }
 
-    const date = new Date(Date.UTC(
-        d.getUTCFullYear(),
-        d.getUTCMonth(),
-        d.getUTCDate(),
-        hour,
-        minute
-    ));
+    // 날짜가 전날로 넘어가는 경우 처리
+    const baseDate = new Date(Date.UTC(year, month, day, hour));
 
-    return {
-        date: dateString(date),
-        time: timeString(date)
-    };
+    const date = [
+        baseDate.getUTCFullYear(),
+        String(baseDate.getUTCMonth() + 1).padStart(2, "0"),
+        String(baseDate.getUTCDate()).padStart(2, "0")
+    ].join("");
+
+    const time = String(baseDate.getUTCHours()).padStart(2, "0") + "00";
+
+    return { date, time };
 }
+
 
 function getForecastBase(now) {
     const d = kstDate(now);
