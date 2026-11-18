@@ -71,85 +71,161 @@ function initApp() {
     }
 }
 
-// app.js의 기존 getWeatherData 함수를 아래 코드로 완전히 교체해 주세요!
+
 async function getWeatherData(lat, lon) {
-    // 💡 오픈메테오 API 주소 (1시간 단위 기온, 강수확률, 날씨코드 및 주간 최고/최저기온 요청)
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
-    
+    const url = `/api/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+
     try {
         const response = await fetch(url);
-        const data = await response.json();
-        
-        // 오픈메테오 데이터를 기존 One Call 3.0 변수 구조와 완벽히 호환되도록 리포맷팅(가공)
-        const now = new Date();
-        const nowHr = now.getHours();
-        
-        // 1. WMO 날씨 코드를 'Main 문자열(Clear, Rain 등)'로 변환하는 내부 매퍼 함수
-        const parseWmoCode = (code) => {
-            if (code <= 1) return { main: "Clear", icon: "01" }; // 맑음
-            if (code <= 3) return { main: "Clouds", icon: "03" }; // 구름/흐림
-            if (code >= 51 && code <= 67) return { main: "Rain", icon: "10" }; // 비
-            if (code >= 71 && code <= 77) return { main: "Snow", icon: "13" }; // 눈
-            if (code >= 80 && code <= 82) return { main: "Rain", icon: "09" }; // 소나기
-            if (code >= 95) return { main: "Thunderstorm", icon: "11" }; // 뇌우
-            return { main: "Clouds", icon: "03" }; // 기본값 흐림
-        };
 
-        const currentWmo = parseWmoCode(data.hourly.weathercode[nowHr]);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `서버 오류 (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        // 기상청 날씨 코드를 기존 화면에서 사용하는 형식으로 변환
+        function parseKmaWeather(pty, sky) {
+            const rainType = Number(pty || 0);
+            const skyType = Number(sky || 1);
+
+            if ([1, 4, 5].includes(rainType)) {
+                return { main: "Rain", icon: "10" };
+            }
+
+            if ([2, 6].includes(rainType)) {
+                return { main: "Rain", icon: "13" };
+            }
+
+            if ([3, 7].includes(rainType)) {
+                return { main: "Snow", icon: "13" };
+            }
+
+            if (skyType === 1) {
+                return { main: "Clear", icon: "01" };
+            }
+
+            if (skyType === 3 || skyType === 4) {
+                return { main: "Clouds", icon: "03" };
+            }
+
+            return { main: "Clouds", icon: "03" };
+        }
+
+        // 기상청 날짜와 시각을 한국 시간으로 변환
+        function makeTimestamp(date, time) {
+            const dateText = String(date);
+            const timeText = String(time).padStart(4, "0");
+
+            return Math.floor(
+                new Date(
+                    `${dateText.slice(0, 4)}-${dateText.slice(4, 6)}-${dateText.slice(6, 8)}T${timeText.slice(0, 2)}:${timeText.slice(2, 4)}:00+09:00`
+                ).getTime() / 1000
+            );
+        }
+
+        const now = new Date();
+        const nowHour = now.getHours();
+
+        // 시간별 예보 데이터 구성
+        const hourly = data.hourly.map(item => {
+            const weather = parseKmaWeather(item.PTY, item.SKY);
+            const timestamp = makeTimestamp(item.date, item.time);
+
+            const itemDate = new Date(timestamp * 1000);
+            const hour = itemDate.getHours();
+
+            return {
+                dt: timestamp,
+                temp: Number(item.TMP),
+                pop: Number(item.POP || 0) / 100,
+                weather: [{
+                    main: weather.main,
+                    icon: weather.icon + (hour >= 6 && hour < 18 ? "d" : "n")
+                }]
+            };
+        }).filter(item => Number.isFinite(item.temp));
+
+        if (hourly.length === 0) {
+            throw new Error("시간별 예보 데이터가 없습니다.");
+        }
+
+        // 날짜별 예보 구성
+        const daily = data.daily.map(day => {
+            const dayItems = data.hourly.filter(
+                item => item.date === day.date
+            );
+
+            const representative = dayItems[0] || {};
+            const weather = parseKmaWeather(
+                representative.PTY,
+                representative.SKY
+            );
+
+            const dateTimestamp = makeTimestamp(day.date, "1200");
+
+            return {
+                dt: dateTimestamp,
+                temp: {
+                    min: Number(day.min),
+                    max: Number(day.max)
+                },
+                pop: dayItems.length
+                    ? Math.max(...dayItems.map(item => Number(item.POP || 0))) / 100
+                    : 0,
+                weather: [{
+                    main: weather.main,
+                    icon: weather.icon + "d"
+                }]
+            };
+        }).filter(day =>
+            Number.isFinite(day.temp.min) &&
+            Number.isFinite(day.temp.max)
+        );
+
+        if (daily.length === 0) {
+            throw new Error("일별 예보 데이터가 없습니다.");
+        }
+
+        // 현재 실황 데이터
+        const currentWeather = parseKmaWeather(
+            data.current.PTY,
+            hourly[0].weather[0].main === "Clear" ? 1 :
+            hourly[0].weather[0].main === "Clouds" ? 3 : 4
+        );
 
         globalWeatherData = {
             current: {
-                temp: data.hourly.temperature_2m[nowHr],
-                sunrise: 6,   // 그라디언트 배경 전환용 기본값 세팅 (오전 6시)
-                sunset: 19,   // 그라디언트 배경 전환용 기본값 세팅 (오후 7시)
-                weather: [{ 
-                    main: currentWmo.main, 
-                    icon: currentWmo.icon + (nowHr >= 6 && nowHr < 18 ? "d" : "n") // 낮밤 아이콘 처리
+                temp: Number(data.current.T1H),
+                sunrise: 6,
+                sunset: 19,
+                weather: [{
+                    main: currentWeather.main,
+                    icon: currentWeather.icon +
+                        (nowHour >= 6 && nowHour < 18 ? "d" : "n")
                 }]
             },
-            // 💡 1시간 단위 데이터를 그대로 살려 스크롤 연동 유지
-            hourly: data.hourly.time.map((timeStr, idx) => {
-                const itemDate = new Date(timeStr);
-                const itemHr = itemDate.getHours();
-                const wmo = parseWmoCode(data.hourly.weathercode[idx]);
-                return {
-                    dt: Math.floor(itemDate.getTime() / 1000),
-                    temp: data.hourly.temperature_2m[idx],
-                    pop: (data.hourly.precipitation_probability[idx] || 0) / 100, // 0~1 범위로 정규화
-                    weather: [{ 
-                        main: wmo.main, 
-                        icon: wmo.icon + (itemHr >= 6 && itemHr < 18 ? "d" : "n") 
-                    }]
-                };
-            }),
-            // 📅 하단 주간 가로 횡 예보용 배열 매핑
-            daily: data.daily.time.map((timeStr, idx) => {
-                const wmo = parseWmoCode(data.daily.weathercode[idx]);
-                return {
-                    dt: Math.floor(new Date(timeStr).getTime() / 1000),
-                    temp: {
-                        min: data.daily.temperature_2m_min[idx],
-                        max: data.daily.temperature_2m_max[idx]
-                    },
-                    pop: 0, // 오픈메테오 일별 기본 강수확률 예외 처리
-                    weather: [{ main: wmo.main, icon: wmo.icon + "d" }]
-                };
-            })
+            hourly,
+            daily
         };
-        
-        // 행정구역 오픈 API 연동 전까지는 깔끔하게 내 위치 정보로 마킹
-        document.getElementById('location').innerText = `📍 현재 내 위치`;
-        
-        // 기존에 만들어둔 렌더링 및 배경 전환 시스템 가동
+
+        document.getElementById('location').innerText =
+            `📍 현재 내 위치`;
+
         updateSiteBackground();
         renderPage();
         renderForecastList(globalWeatherData.daily);
-        
+
+        console.log("기상청 날씨 데이터 로딩 완료", data);
+
     } catch (e) {
-        console.error("오픈메테오 API 통신 에러:", e);
-        document.getElementById('location').innerText = `❌ 날씨 데이터 로딩 실패`;
+        console.error("기상청 API 통신 에러:", e);
+        document.getElementById('location').innerText =
+            `❌ 날씨 데이터 로딩 실패`;
     }
 }
+
 
 // 🌤️ 날씨 조건 + 시간대를 조합한 동적 그라디언트 시스템
 function updateSiteBackground() {
